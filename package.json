@@ -1,0 +1,93 @@
+{
+  "name": "@eqty-core/events",
+  "version": "1.0.0-alpha.1",
+  "description": "EQTY Core Client Library",
+  "main": "lib/cjs/index.js",
+  "module": "lib/esm/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "require": "./lib/cjs/index.js",
+      "import": "./lib/esm/index.js",
+      "default": "./lib/esm/index.js"
+    },
+    "./events": {
+      "types": "./lib/types/events/index.d.ts",
+      "require": "./lib/cjs/events/index.js",
+      "import": "./lib/esm/events/index.js",
+      "default": "./lib/esm/events/index.js"
+    },
+    "./messages": {
+      "types": "./lib/types/messages/index.d.ts",
+      "require": "./lib/cjs/messages/index.js",
+      "import": "./lib/esm/messages/index.js",
+      "default": "./lib/esm/messages/index.js"
+    },
+    "./signer": {
+      "types": "./lib/types/signer/index.d.ts",
+      "require": "./lib/cjs/signer/index.js",
+      "import": "./lib/esm/signer/index.js",
+      "default": "./lib/esm/signer/index.js"
+    },
+    "./anchor": {
+      "types": "./lib/types/anchor/index.d.ts",
+      "require": "./lib/cjs/anchor/index.js",
+      "import": "./lib/esm/anchor/index.js",
+      "default": "./lib/esm/anchor/index.js"
+    },
+    "./utils": {
+      "types": "./lib/types/utils/index.d.ts",
+      "require": "./lib/cjs/utils/index.js",
+      "import": "./lib/esm/utils/index.js",
+      "default": "./lib/esm/utils/index.js"
+    }
+  },
+  "files": [
+    "lib",
+    "src"
+  ],
+  "scripts": {
+    "clean": "rm -rf ./lib ./dist",
+    "build": "npm run compile",
+    "compile": "tsc -p ./tsconfig.cjs.json && tsc -p ./tsconfig.esm.json && tsc -p ./tsconfig.types.json",
+    "test": "TS_NODE_PROJECT=tsconfig.test.json mocha --require ts-node/register 'test/**/*.spec.ts'",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint-fix": "eslint src --ext .ts,.tsx --fix",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\""
+  },
+  "keywords": [
+    "eqty",
+    "events",
+    "base",
+    "ethereum",
+    "blockchain",
+    "event-chain",
+    "messaging"
+  ],
+  "author": "EQTY Team",
+  "license": "MIT",
+  "dependencies": {
+    "@scure/base": "^1.2.6",
+    "ethers": "^6.8.0"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.3.5",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.5.0",
+    "@typescript-eslint/eslint-plugin": "^6.4.0",
+    "@typescript-eslint/parser": "^6.4.0",
+    "chai": "^4.3.7",
+    "eslint": "^8.47.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "mocha": "^10.2.0",
+    "prettier": "^3.0.2",
+    "ts-node": "^10.9.1",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.1.6"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
