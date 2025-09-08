@@ -18,6 +18,14 @@ export default class EventChain {
         key: Binary;
         value: Binary;
     }>;
+    /**
+     * Get all anchor points for incremental anchoring
+     * This is useful for anchoring multiple state transitions at once
+     */
+    getIncrementalAnchorMap(): Array<{
+        key: Binary;
+        value: Binary;
+    }>;
     verify(): boolean;
     toJSON(): IEventChainJSON;
     static from(data: IEventChainJSON): EventChain;

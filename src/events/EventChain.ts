@@ -53,8 +53,8 @@ export default class EventChain {
   }
 
   getAnchorMap(): Array<{ key: Binary; value: Binary }> {
-    // Always returns ONE { stateHash → lastEventHash } pair
-    // This anchors the final state of the chain
+    // For Base anchoring, we anchor the state hash as key and the latest event hash as value
+    // This provides a clean way to verify the current state of the event chain
     return [
       {
         key: this.stateHash,
@@ -64,6 +64,34 @@ export default class EventChain {
             : this.stateHash,
       },
     ];
+  }
+
+  /**
+   * Get all anchor points for incremental anchoring
+   * This is useful for anchoring multiple state transitions at once
+   */
+  getIncrementalAnchorMap(): Array<{ key: Binary; value: Binary }> {
+    if (this.events.length === 0) {
+      return [{ key: this.stateHash, value: this.stateHash }];
+    }
+
+    const anchors: Array<{ key: Binary; value: Binary }> = [];
+    let currentState = new Binary(keccak256(this.id));
+
+    for (const event of this.events) {
+      const eventHash = event.hash;
+      const combined = Binary.concat(currentState, eventHash);
+      const newState = new Binary(keccak256(combined));
+
+      anchors.push({
+        key: currentState,
+        value: eventHash,
+      });
+
+      currentState = newState;
+    }
+
+    return anchors;
   }
 
   verify(): boolean {

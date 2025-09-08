@@ -4,5 +4,7 @@
     "module": "ESNext",
     "outDir": "./lib/esm",
     "noEmit": false
-  }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "lib", "test"]
 } 

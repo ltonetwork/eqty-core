@@ -8,9 +8,7 @@ import {
   IEventSignable,
 } from "../types/events";
 import EventChain from "./EventChain";
-
-export const EVENT_CHAIN_V1 = 0;
-export const EVENT_CHAIN_V2 = 1;
+import { EVENT_CHAIN_V1, EVENT_CHAIN_V2, HEX_PREFIX } from "../constants";
 
 export default class Event implements IEventSignable {
   private version = EVENT_CHAIN_V2;
@@ -140,7 +138,7 @@ export default class Event implements IEventSignable {
       // Recover signer from signature using ethers.js
       const binaryData = this.toBinary();
       const messageHash = keccak256(binaryData);
-      const signatureHex = "0x" + this.signature.hex;
+      const signatureHex = HEX_PREFIX + this.signature.hex;
       const recoveredAddress = recoverAddress(messageHash, signatureHex);
       return (
         recoveredAddress.toLowerCase() === this.signerAddress.toLowerCase()

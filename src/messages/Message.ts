@@ -8,9 +8,7 @@ import {
   IMessageSignable,
 } from "../types/messages";
 import { concatBytes } from "@noble/hashes/utils";
-
-const MESSAGE_V1 = 0;
-const MESSAGE_V2 = 1;
+import { MESSAGE_V1, MESSAGE_V2, HEX_PREFIX, HASH_LENGTH } from "../constants";
 
 export default class Message implements IMessageSignable {
   /** Version of the message */
@@ -46,7 +44,7 @@ export default class Message implements IMessageSignable {
   constructor(
     data: IMessageData | string | Uint8Array,
     mediaType?: string,
-    meta: Partial<IMessageMeta> | string = {},
+    meta: Partial<IMessageMeta> | string = {}
   ) {
     if (typeof meta === "string") meta = { type: meta }; // Backwards compatibility
 
@@ -111,7 +109,7 @@ export default class Message implements IMessageSignable {
 
     // Simplified decryption - in production use proper ECIES
     const encryptedData = this._encryptedData;
-    const dataLength = encryptedData.length - 32; // Remove recipient hash
+    const dataLength = encryptedData.length - HASH_LENGTH; // Remove recipient hash
     this.data = new Binary(encryptedData.slice(0, dataLength));
     this._encryptedData = undefined;
 
@@ -135,7 +133,7 @@ export default class Message implements IMessageSignable {
       return this;
     } catch (error) {
       throw new Error(
-        `Failed to sign message: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Failed to sign message: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
   }
@@ -150,7 +148,7 @@ export default class Message implements IMessageSignable {
     try {
       // Recover signer from signature using ethers.js
       const messageHash = keccak256(this.toBinary(false));
-      const signatureHex = "0x" + this.signature.hex;
+      const signatureHex = HEX_PREFIX + this.signature.hex;
       const recoveredAddress = recoverAddress(messageHash, signatureHex);
       return recoveredAddress.toLowerCase() === this.sender.toLowerCase();
     } catch (error) {
@@ -260,7 +258,7 @@ export default class Message implements IMessageSignable {
       const message = new Message(
         Binary.fromBase58(json.data),
         json.mediaType,
-        json.meta,
+        json.meta
       );
       message.version = json.version;
       message.timestamp = json.timestamp;
@@ -277,7 +275,7 @@ export default class Message implements IMessageSignable {
       return message;
     } catch (error) {
       throw new Error(
-        `Failed to create message from JSON: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Failed to create message from JSON: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
   }
@@ -334,8 +332,8 @@ export default class Message implements IMessageSignable {
         new DataView(
           timestampBytes.buffer,
           timestampBytes.byteOffset,
-          8,
-        ).getBigUint64(0, false),
+          8
+        ).getBigUint64(0, false)
       );
       offset += 8;
 
@@ -361,7 +359,7 @@ export default class Message implements IMessageSignable {
       return message;
     } catch (error) {
       throw new Error(
-        `Failed to create message from binary: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Failed to create message from binary: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
   }

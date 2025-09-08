@@ -7,7 +7,7 @@ export default class Relay {
     post(endpoint: string, postData: unknown, headers?: Record<string, string>): Promise<IRelayResponse>;
     get(endpoint: string, headers?: Record<string, string>): Promise<IRelayResponse>;
     send(message: Message): Promise<Message>;
-    getMessages(recipient: string, limit?: number, offset?: number): Promise<Message[]>;
+    getMessages(recipient: string, limit?: 50, offset?: 0): Promise<Message[]>;
     getMessage(id: string): Promise<Message>;
 }
 //# sourceMappingURL=Relay.d.ts.map

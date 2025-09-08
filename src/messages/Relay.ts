@@ -1,5 +1,6 @@
 import Message from "./Message";
 import { IMessageJSON, IRelayMessage, IRelayResponse } from "../types/messages";
+import { DEFAULT_CONFIG } from "../constants";
 
 export default class Relay {
   readonly url: string;
@@ -16,7 +17,7 @@ export default class Relay {
   async post(
     endpoint: string,
     postData: unknown,
-    headers: Record<string, string> = {},
+    headers: Record<string, string> = {}
   ): Promise<IRelayResponse> {
     endpoint = endpoint.replace(/^\//, "");
     headers["content-type"] = "application/json";
@@ -32,7 +33,7 @@ export default class Relay {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(
-        `Relay error: ${response.status} - ${JSON.stringify(errorData)}`,
+        `Relay error: ${response.status} - ${JSON.stringify(errorData)}`
       );
     }
 
@@ -41,7 +42,7 @@ export default class Relay {
 
   async get(
     endpoint: string,
-    headers: Record<string, string> = {},
+    headers: Record<string, string> = {}
   ): Promise<IRelayResponse> {
     endpoint = endpoint.replace(/^\//, "");
 
@@ -53,7 +54,7 @@ export default class Relay {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(
-        `Relay error: ${response.status} - ${JSON.stringify(errorData)}`,
+        `Relay error: ${response.status} - ${JSON.stringify(errorData)}`
       );
     }
 
@@ -78,14 +79,14 @@ export default class Relay {
 
   async getMessages(
     recipient: string,
-    limit = 50,
-    offset = 0,
+    limit = DEFAULT_CONFIG.DEFAULT_MESSAGE_LIMIT,
+    offset = DEFAULT_CONFIG.DEFAULT_MESSAGE_OFFSET
   ): Promise<Message[]> {
     const response = await this.get(
-      `/messages/${recipient}?limit=${limit}&offset=${offset}`,
+      `/messages/${recipient}?limit=${limit}&offset=${offset}`
     );
     return (response.messages || []).map((msg: IMessageJSON) =>
-      Message.from(msg),
+      Message.from(msg)
     );
   }
 

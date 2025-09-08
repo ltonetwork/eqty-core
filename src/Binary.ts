@@ -2,6 +2,7 @@ import { keccak256 } from "ethers";
 import { base58 } from "@scure/base";
 
 import { IBinary } from "./types/binary";
+import { HEX_PREFIX, HEX_PREFIX_LENGTH, BYTES_PER_HEX_CHAR } from "./constants";
 
 export default class Binary extends Uint8Array implements IBinary {
   constructor(value?: string | ArrayLike<number> | number) {
@@ -37,7 +38,7 @@ export default class Binary extends Uint8Array implements IBinary {
   /** Create a keccak256 hash (Ethereum standard) */
   hash(): Binary {
     const hashHex = keccak256(this);
-    return Binary.fromHex(hashHex.slice(2)); // Remove '0x' prefix
+    return Binary.fromHex(hashHex.slice(HEX_PREFIX_LENGTH)); // Remove '0x' prefix
   }
 
   /** Create HMAC SHA256 hash */
@@ -72,12 +73,12 @@ export default class Binary extends Uint8Array implements IBinary {
   static from<T>(
     arrayLike: ArrayLike<T>,
     mapfn: (v: T, k: number) => number,
-    thisArg?: any,
+    thisArg?: any
   ): Binary;
   static from<T>(
     arrayLike: ArrayLike<T> | string,
     mapfn?: (v: T, k: number) => number,
-    thisArg?: any,
+    thisArg?: any
   ): Binary {
     if (typeof arrayLike === "string") {
       return new Binary(arrayLike);
@@ -93,7 +94,7 @@ export default class Binary extends Uint8Array implements IBinary {
       return new Binary(base58.decode(value));
     } catch (error) {
       throw new Error(
-        `Invalid base58 string: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Invalid base58 string: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
   }
@@ -103,33 +104,35 @@ export default class Binary extends Uint8Array implements IBinary {
       return new Binary(
         atob(value)
           .split("")
-          .map((c) => c.charCodeAt(0)),
+          .map((c) => c.charCodeAt(0))
       );
     } catch (error) {
       throw new Error(
-        `Invalid base64 string: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Invalid base64 string: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
   }
 
   static fromHex(value: string): Binary {
     try {
-      const hex = value.startsWith("0x") ? value.slice(2) : value;
-      if (hex.length % 2 !== 0) {
+      const hex = value.startsWith(HEX_PREFIX)
+        ? value.slice(HEX_PREFIX_LENGTH)
+        : value;
+      if (hex.length % BYTES_PER_HEX_CHAR !== 0) {
         throw new Error("Hex string must have even length");
       }
-      const bytes = new Uint8Array(hex.length / 2);
-      for (let i = 0; i < hex.length; i += 2) {
-        const byte = parseInt(hex.substr(i, 2), 16);
+      const bytes = new Uint8Array(hex.length / BYTES_PER_HEX_CHAR);
+      for (let i = 0; i < hex.length; i += BYTES_PER_HEX_CHAR) {
+        const byte = parseInt(hex.substr(i, BYTES_PER_HEX_CHAR), 16);
         if (isNaN(byte)) {
           throw new Error(`Invalid hex character at position ${i}`);
         }
-        bytes[i / 2] = byte;
+        bytes[i / BYTES_PER_HEX_CHAR] = byte;
       }
       return new Binary(bytes);
     } catch (error) {
       throw new Error(
-        `Invalid hex string: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Invalid hex string: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
   }
@@ -152,7 +155,7 @@ export default class Binary extends Uint8Array implements IBinary {
       }
     } catch (error) {
       throw new Error(
-        `Invalid multibase string: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Invalid multibase string: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
   }

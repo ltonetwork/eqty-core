@@ -2,8 +2,6 @@ import { ISigner } from "../signer";
 import Binary from "../Binary";
 import { IEventJSON, IEventData, IEventAttachment, IEventSignable } from "../types/events";
 import EventChain from "./EventChain";
-export declare const EVENT_CHAIN_V1 = 0;
-export declare const EVENT_CHAIN_V2 = 1;
 export default class Event implements IEventSignable {
     private version;
     /** Meta type of the data */

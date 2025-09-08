@@ -157,18 +157,34 @@ class Relay {
 
 #### `AnchorClient`
 
-Interfaces with the Base smart contract for anchoring.
+Interfaces with the Base smart contract for anchoring with full fee management.
 
 ```typescript
 class AnchorClient {
   constructor(contractAddress: string, signer: Signer);
 
-  async anchor(key: Binary, value: Binary): Promise<any>;
+  // Core anchoring methods
+  async anchor(key: Binary, value: Binary): Promise<AnchorResult>;
   async anchorMany(
     anchors: Array<{ key: Binary; value: Binary }>
-  ): Promise<any[]>;
-  async anchorEventChain(chainId: string, stateHash: Binary): Promise<any>;
-  async anchorMessage(messageHash: Binary): Promise<any>;
+  ): Promise<AnchorResult>;
+  async anchorEventChain(
+    chainId: string,
+    stateHash: Binary
+  ): Promise<AnchorResult>;
+  async anchorMessage(messageHash: Binary): Promise<AnchorResult>;
+
+  // Fee management
+  async getAnchorFee(): Promise<bigint>;
+  async getEqtyTokenAddress(): Promise<string>;
+  async requiresFee(): Promise<boolean>;
+  async getTotalFee(anchorCount: number): Promise<bigint>;
+  async hasSufficientBalance(anchorCount: number): Promise<boolean>;
+  async hasSufficientAllowance(anchorCount: number): Promise<boolean>;
+
+  // Validation
+  getMaxAnchorsPerTx(): number;
+  validateAnchorCount(anchorCount: number): void;
 }
 ```
 
@@ -216,17 +232,33 @@ class Binary extends Uint8Array {
 
 ## Smart Contract Integration
 
-The library expects a simple anchor contract on Base with the following interface:
+The library is perfectly aligned with the ownables-base Anchor contract:
 
 ```solidity
-contract Anchor {
-    event Anchored(bytes32 indexed key, bytes32 value, address indexed sender);
-
-    function anchor(bytes32 key, bytes32 value) external {
-        emit Anchored(key, value, msg.sender);
+contract Anchor is IAnchor, Ownable2Step {
+    struct Anchor {
+        bytes32 key;
+        bytes32 value;
     }
+
+    event Anchored(bytes32 indexed key, bytes32 value, address indexed sender, uint64 timestamp);
+
+    function anchor(Anchor[] calldata anchors) external {
+        // Handles EQTY token fees and emits events for each anchor
+    }
+
+    function anchorFee() external view returns (uint256);
+    function eqtyToken() external view returns (address);
 }
 ```
+
+### Key Features:
+
+- **Perfect ABI Alignment**: Uses exact contract interface
+- **Fee Handling**: Automatic EQTY token fee management
+- **Batch Anchoring**: Supports up to 100 anchors per transaction
+- **Gas Optimized**: Leverages stateless event-only design
+- **Base Native**: Deployed on Base Sepolia and mainnet
 
 ## Migration from LTO
 
