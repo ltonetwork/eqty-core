@@ -4,11 +4,7 @@
     "es2021": true,
     "node": true
   },
-  "extends": [
-    "eslint:recommended",
-    "plugin:@typescript-eslint/recommended",
-    "plugin:prettier/recommended"
-  ],
+  "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
     "ecmaVersion": 13,
@@ -24,7 +20,9 @@
     "@typescript-eslint/no-unused-vars": [
       "error",
       { "argsIgnorePattern": "^_" }
-    ]
+    ],
+    "comma-dangle": "off",
+    "@typescript-eslint/comma-dangle": "off"
   },
   "ignorePatterns": ["lib/*", "node_modules/*"]
 }

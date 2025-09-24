@@ -9,10 +9,7 @@ export { Message, Relay } from "./messages";
 
 // Signer
 export type { ISigner } from "./signer";
-export { EthersSigner } from "./signer";
-
-// Account
-export { EthereumAccount } from "./account";
+export { EthersSigner, PrivateKeySigner } from "./signer";
 
 // Anchor
 export { AnchorClient } from "./anchor";

@@ -7,48 +7,33 @@ export interface AnchorClientConfig {
     network?: NetworkName;
     gasLimit?: bigint;
 }
+/**
+ * Simplified AnchorClient for Base blockchain anchoring
+ * No EQTY token fees - aligns with deployed contract (fee = 0, no token)
+ */
 export default class AnchorClient {
     private contract;
     private signer;
     private config;
     constructor(signer: Signer, config?: AnchorClientConfig);
-    anchor(key: Binary, value: Binary): Promise<AnchorResult>;
-    anchorMany(anchors: Array<{
+    /**
+     * Unified anchor method with function overloading
+     * Supports multiple input types for different use cases
+     */
+    anchor(input: Array<{
         key: Binary;
         value: Binary;
     }>): Promise<AnchorResult>;
-    anchorEventChain(chainId: string, stateHash: Binary): Promise<AnchorResult>;
-    anchorMessage(messageHash: Binary): Promise<AnchorResult>;
-    anchorMultiple(anchors: Array<{
-        key: Binary;
-        value: Binary;
-    }>): Promise<AnchorResult[]>;
+    anchor(input: Binary, value?: Binary): Promise<AnchorResult>;
+    anchor(input: string, value: Binary): Promise<AnchorResult>;
+    /**
+     * Get the underlying contract instance
+     */
     getContract(): Contract;
+    /**
+     * Get the signer address
+     */
     getSignerAddress(): Promise<string>;
-    /**
-     * Get the current anchor fee from the contract
-     */
-    getAnchorFee(): Promise<bigint>;
-    /**
-     * Get the EQTY token address from the contract
-     */
-    getEqtyTokenAddress(): Promise<string>;
-    /**
-     * Check if anchoring requires fees
-     */
-    requiresFee(): Promise<boolean>;
-    /**
-     * Get the total fee required for anchoring multiple items
-     */
-    getTotalFee(anchorCount: number): Promise<bigint>;
-    /**
-     * Check if user has sufficient EQTY balance for anchoring
-     */
-    hasSufficientBalance(anchorCount: number): Promise<boolean>;
-    /**
-     * Check if user has sufficient EQTY allowance for anchoring
-     */
-    hasSufficientAllowance(anchorCount: number): Promise<boolean>;
     /**
      * Get the maximum number of anchors allowed per transaction
      */

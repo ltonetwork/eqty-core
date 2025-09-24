@@ -1,8 +1,12 @@
-import { Signer, keccak256 } from "ethers";
+import { Signer } from "ethers";
 import { ISigner } from "./ISigner";
 import Binary from "../Binary";
 import { HEX_PREFIX_LENGTH } from "../constants";
 
+/**
+ * Wallet-based signer implementation (MetaMask, WalletConnect, etc.)
+ * Uses connected wallet signers for signing operations
+ */
 export class EthersSigner implements ISigner {
   constructor(private signer: Signer) {}
 
@@ -19,7 +23,21 @@ export class EthersSigner implements ISigner {
 
   async signMessage(message: string | Uint8Array): Promise<string> {
     const messageStr =
-      typeof message === "string" ? message : new Binary(message).toString();
+      typeof message === "string" ? message : new TextDecoder().decode(message);
     return await this.signer.signMessage(messageStr);
+  }
+
+  /**
+   * Get the underlying ethers Signer
+   */
+  getSigner(): Signer {
+    return this.signer;
+  }
+
+  /**
+   * Create an EthersSigner from a connected wallet Signer
+   */
+  static fromSigner(signer: Signer): EthersSigner {
+    return new EthersSigner(signer);
   }
 }

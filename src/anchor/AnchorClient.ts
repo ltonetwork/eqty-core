@@ -10,65 +10,7 @@ import {
   ZERO_HASH,
   HEX_PREFIX,
 } from "../constants";
-
-// ABI for the Base anchor contract - matches ownables-base exactly
-const ANCHOR_ABI = [
-  {
-    inputs: [
-      {
-        components: [
-          { name: "key", type: "bytes32" },
-          { name: "value", type: "bytes32" },
-        ],
-        name: "anchors",
-        type: "tuple[]",
-      },
-    ],
-    name: "anchor",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      { indexed: true, name: "key", type: "bytes32" },
-      { indexed: false, name: "value", type: "bytes32" },
-      { indexed: true, name: "sender", type: "address" },
-      { indexed: false, name: "timestamp", type: "uint64" },
-    ],
-    name: "Anchored",
-    type: "event",
-  },
-  {
-    inputs: [],
-    name: "anchorFee",
-    outputs: [{ name: "", type: "uint256" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "eqtyToken",
-    outputs: [{ name: "", type: "address" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [{ name: "newFee", type: "uint256" }],
-    name: "setAnchorFee",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [{ name: "newEqtyToken", type: "address" }],
-    name: "setEqtyToken",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-];
+import { ANCHOR_ABI } from "./AnchorABI";
 
 export interface AnchorClientConfig {
   contractAddress?: string;
@@ -76,6 +18,9 @@ export interface AnchorClientConfig {
   gasLimit?: bigint;
 }
 
+/**
+ * Simplified AnchorClient for Base blockchain anchoring
+ */
 export default class AnchorClient {
   private contract: Contract;
   private signer: Signer;
@@ -111,54 +56,48 @@ export default class AnchorClient {
     };
   }
 
-  async anchor(key: Binary, value: Binary): Promise<AnchorResult> {
-    return this.anchorMany([{ key, value }]);
-  }
-
-  async anchorMany(
-    anchors: Array<{ key: Binary; value: Binary }>
+  /**
+   * anchor method
+   */
+  async anchor(
+    input: Array<{ key: Binary; value: Binary }>
+  ): Promise<AnchorResult>;
+  async anchor(input: Binary, value?: Binary): Promise<AnchorResult>;
+  async anchor(input: string, value: Binary): Promise<AnchorResult>;
+  async anchor(
+    input: Array<{ key: Binary; value: Binary }> | Binary | string,
+    value?: Binary
   ): Promise<AnchorResult> {
     try {
+      let anchors: Array<{ key: Binary; value: Binary }>;
+
+      if (Array.isArray(input)) {
+        // Array of anchor pairs
+        anchors = input;
+      } else if (typeof input === "string") {
+        // Event chain: chainId + stateHash
+        if (!value) {
+          throw new Error("StateHash required for event chain anchoring");
+        }
+        const chainIdHash = keccak256(Buffer.from(input, "utf8"));
+        const key = Binary.fromHex(chainIdHash.slice(2));
+        anchors = [{ key, value }];
+      } else if (input instanceof Binary) {
+        // Single anchor or message
+        if (value) {
+          // Single key-value pair
+          anchors = [{ key: input, value }];
+        } else {
+          // Message anchoring (value = 0x0)
+          const zeroValue = Binary.fromHex(ZERO_HASH);
+          anchors = [{ key: input, value: zeroValue }];
+        }
+      } else {
+        throw new Error("Invalid input type for anchoring");
+      }
+
       // Validate anchor count
       this.validateAnchorCount(anchors.length);
-
-      // Check if fees are required and handle them
-      const fee = await this.getAnchorFee();
-      const eqtyTokenAddress = await this.getEqtyTokenAddress();
-
-      if (fee > 0n && eqtyTokenAddress !== ZERO_ADDRESS) {
-        // Handle EQTY token fee payment
-        const totalFee = fee * BigInt(anchors.length);
-        const eqtyToken = new Contract(
-          eqtyTokenAddress,
-          [
-            "function burnFrom(address account, uint256 amount) external",
-            "function balanceOf(address account) external view returns (uint256)",
-            "function allowance(address owner, address spender) external view returns (uint256)",
-          ],
-          this.signer
-        );
-
-        // Check balance and allowance
-        const userAddress = await this.signer.getAddress();
-        const balance = await eqtyToken.balanceOf(userAddress);
-        const allowance = await eqtyToken.allowance(
-          userAddress,
-          this.contract.target
-        );
-
-        if (balance < totalFee) {
-          throw new Error(
-            `Insufficient EQTY balance. Required: ${totalFee}, Available: ${balance}`
-          );
-        }
-
-        if (allowance < totalFee) {
-          throw new Error(
-            `Insufficient EQTY allowance. Required: ${totalFee}, Allowed: ${allowance}. Please approve the contract to spend EQTY tokens.`
-          );
-        }
-      }
 
       // Convert to the format expected by the Base contract
       const anchorStructs = anchors.map(({ key, value }) => ({
@@ -191,141 +130,18 @@ export default class AnchorClient {
     }
   }
 
-  async anchorEventChain(
-    chainId: string,
-    stateHash: Binary
-  ): Promise<AnchorResult> {
-    try {
-      // Hash the chainId to create a unique key for the event chain
-      const chainIdHash = keccak256(Buffer.from(chainId, "utf8"));
-      const key = Binary.fromHex(chainIdHash.slice(2));
-      return await this.anchor(key, stateHash);
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-
-      return {
-        success: false,
-        error: errorMessage,
-      };
-    }
-  }
-
-  async anchorMessage(messageHash: Binary): Promise<AnchorResult> {
-    try {
-      // Anchor message with zero value as specified in requirements
-      const zeroValue = Binary.fromHex(ZERO_HASH);
-      return await this.anchor(messageHash, zeroValue);
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-
-      return {
-        success: false,
-        error: errorMessage,
-      };
-    }
-  }
-
-  async anchorMultiple(
-    anchors: Array<{ key: Binary; value: Binary }>
-  ): Promise<AnchorResult[]> {
-    const result = await this.anchorMany(anchors);
-    return [result];
-  }
-
+  /**
+   * Get the underlying contract instance
+   */
   getContract(): Contract {
     return this.contract;
   }
 
+  /**
+   * Get the signer address
+   */
   async getSignerAddress(): Promise<string> {
     return await this.signer.getAddress();
-  }
-
-  /**
-   * Get the current anchor fee from the contract
-   */
-  async getAnchorFee(): Promise<bigint> {
-    return await this.contract.anchorFee();
-  }
-
-  /**
-   * Get the EQTY token address from the contract
-   */
-  async getEqtyTokenAddress(): Promise<string> {
-    return await this.contract.eqtyToken();
-  }
-
-  /**
-   * Check if anchoring requires fees
-   */
-  async requiresFee(): Promise<boolean> {
-    const fee = await this.getAnchorFee();
-    const tokenAddress = await this.getEqtyTokenAddress();
-    return (
-      fee > 0n && tokenAddress !== "0x0000000000000000000000000000000000000000"
-    );
-  }
-
-  /**
-   * Get the total fee required for anchoring multiple items
-   */
-  async getTotalFee(anchorCount: number): Promise<bigint> {
-    const fee = await this.getAnchorFee();
-    return fee * BigInt(anchorCount);
-  }
-
-  /**
-   * Check if user has sufficient EQTY balance for anchoring
-   */
-  async hasSufficientBalance(anchorCount: number): Promise<boolean> {
-    const fee = await this.getAnchorFee();
-    const tokenAddress = await this.getEqtyTokenAddress();
-
-    if (fee === 0n || tokenAddress === ZERO_ADDRESS) {
-      return true; // No fees required
-    }
-
-    const totalFee = await this.getTotalFee(anchorCount);
-    const userAddress = await this.signer.getAddress();
-
-    const eqtyToken = new Contract(
-      tokenAddress,
-      ["function balanceOf(address account) external view returns (uint256)"],
-      this.signer
-    );
-
-    const balance = await eqtyToken.balanceOf(userAddress);
-    return balance >= totalFee;
-  }
-
-  /**
-   * Check if user has sufficient EQTY allowance for anchoring
-   */
-  async hasSufficientAllowance(anchorCount: number): Promise<boolean> {
-    const fee = await this.getAnchorFee();
-    const tokenAddress = await this.getEqtyTokenAddress();
-
-    if (fee === 0n || tokenAddress === ZERO_ADDRESS) {
-      return true; // No fees required
-    }
-
-    const totalFee = await this.getTotalFee(anchorCount);
-    const userAddress = await this.signer.getAddress();
-
-    const eqtyToken = new Contract(
-      tokenAddress,
-      [
-        "function allowance(address owner, address spender) external view returns (uint256)",
-      ],
-      this.signer
-    );
-
-    const allowance = await eqtyToken.allowance(
-      userAddress,
-      this.contract.target
-    );
-    return allowance >= totalFee;
   }
 
   /**
