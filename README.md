@@ -1,4 +1,4 @@
-# @eqty-core/events
+# EQTY Core
 
 EQTY Core Events Library - Base-compatible event chain and messaging for EQTY
 
@@ -17,7 +17,7 @@ This library provides a clean, Base-compatible implementation of event chains an
 ## Installation
 
 ```bash
-npm install @eqty-core/events
+npm install eqty-core
 ```
 
 ## Quick Start
@@ -25,7 +25,7 @@ npm install @eqty-core/events
 ### Basic Event Chain Usage
 
 ```typescript
-import { Event, EventChain, EthersSigner } from "@eqty-core/events";
+import { Event, EventChain, EthersSigner } from "eqty-core";
 import { ethers } from "ethers";
 
 // Connect to wallet
@@ -51,7 +51,7 @@ console.log("Anchor to submit:", anchors); // Single { stateHash → lastEventHa
 ### Messaging
 
 ```typescript
-import { Message, Relay } from "@eqty-core/events";
+import { Message, Relay } from "eqty-core";
 
 // Create a message
 const message = new Message("Hello from EQTY!", "text/plain", {
@@ -73,7 +73,7 @@ await relay.send(message);
 ### Base Anchoring
 
 ```typescript
-import { AnchorClient } from "@eqty-core/events";
+import { AnchorClient } from "eqty-core";
 
 // Create anchor client
 const anchorClient = new AnchorClient(
