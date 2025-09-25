@@ -16,9 +16,6 @@ export { AnchorClient } from "./anchor";
 export type { AnchorResult } from "./anchor";
 export type { AnchorClientConfig } from "./anchor/AnchorClient";
 
-// Utils
-export * from "./utils";
-
 // Constants
 export * from "./constants";
 

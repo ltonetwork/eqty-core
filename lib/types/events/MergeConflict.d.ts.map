@@ -1,1 +1,0 @@
-{"version":3,"file":"MergeConflict.d.ts","sourceRoot":"","sources":["../../../src/events/MergeConflict.ts"],"names":[],"mappings":"AAAA,OAAO,UAAU,MAAM,cAAc,CAAC;AACtC,OAAO,KAAK,MAAM,SAAS,CAAC;AAE5B,MAAM,CAAC,OAAO,OAAO,aAAc,SAAQ,KAAK;IAErC,KAAK,EAAE,UAAU;IACjB,IAAI,EAAE,KAAK;IACX,KAAK,EAAE,KAAK;gBAFZ,KAAK,EAAE,UAAU,EACjB,IAAI,EAAE,KAAK,EACX,KAAK,EAAE,KAAK;CAMtB"}
