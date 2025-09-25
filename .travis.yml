@@ -1,0 +1,79 @@
+language: node_js
+dist: jammy
+node_js:
+  - 20
+  - 22
+cache: yarn
+
+branches:
+  only:
+    - main
+    - /^v\d+\.\d+\.\d+$/
+
+before_install:
+  - git config --local user.name "LTO Network"
+  - git config --local user.email "info@ltonetwork.com"
+install:
+  - yarn install
+script:
+  - yarn test
+
+stages:
+  - name: test
+    if: tag IS blank
+
+jobs:
+  include:
+    - name: 'Publish GitHub release'
+      dist: jammy
+      stage: deploy
+      if: branch = main AND type = push
+      before_script:
+        - CURRENT_VERSION=$(git describe --tags --abbrev=0)
+        - |
+          if (git log $CURRENT_VERSION..HEAD | grep -q -i "\[bump:major\]"); then
+            NEXT_VERSION=$(awk -F. -v OFS=. '{$1++;$2=0;$3=0;print}' <<< "$CURRENT_VERSION")
+          elif (git log $CURRENT_VERSION..HEAD | grep -q -i "\[bump:minor\]"); then
+            NEXT_VERSION=$(awk -F. -v OFS=. '{$2++;$3=0;print}' <<< "$CURRENT_VERSION")
+          else
+            NEXT_VERSION=$(awk -F. -v OFS=. '{$3++;print}' <<< "$CURRENT_VERSION")
+          fi
+      script:
+        - git tag "$NEXT_VERSION"
+      before_deploy:
+        - gem update --system --force
+        - gem install bundler -v 2.4.22 --no-document
+        - gem install dpl --no-document
+        - ruby -v
+        - gem list | grep uri
+      deploy:
+        provider: releases
+        api_key:
+          secure: "WqOtlAxE7NCfhURS7ggKWoFNLT5DOf4XVIEZ2p9LfyoEb1DIsAy3VDU6ttjmTcyBC+Uu0ZWb+habx7VcnqePHS+ERD9peZVsJaBiNT2DKOlBp7mD6Cy2Of3+RmM30lBg2SJdXr7tzJud7G1/aCUnlGcLzxDlqQlpezFrz7gCu81EaAazq2JFC3HbQ9E78ejh2nqAG9wYiwfW0TbW1TjDJ9EHOZkgSVOQrcgVPoS+wIhwOzDrDHJf7Fe1idCGRIUPYOTvEtYzqlhl+d7RtBEJ5o+nMSdqmebbTzc+fOjrNPrYhJJt9/fYBvN2qEeSkHrmA9NEozebNM/jEOoYl5CqYtbrE/F4x21IX8xcvpchyEkgYEakQSgEoyonTmPRB7aXFbp+/iMdzUSYWSvpvVLNXlh+CffRPalKtj1mW9voiiHNRuo5JJn40VcKoA73DCX4tCrekjHJ1xBl0g7D2Hi/hC8lkmsLDkqBxwoq6UahDWWO/NEpgjy2w+72OgYDx7EDyPofTsJiFtyXk1uvEllyYmWXx5202kPl4VgVdVwspCtC94zuEH0wWe5vu4pYsR0FZJsUW5TDS9KDGeYyqUFFhOMjym3f9FzyCAIXq8DC6fU7g+4ucZlLsrcorxKT8p5Pqv/hzucm2+cbjGC6Vm0dU32LRhl1G/eH/XUye3tbi0U="
+        on:
+          all_branches: true
+    - name: 'Publish to NPM'
+      dist: jammy
+      stage: deploy
+      if: tag IS present
+      before_install:
+        - yarn version --new-version $TRAVIS_TAG --no-git-tag-version
+      before_script:
+        - npx tsc --version
+      script:
+        - yarn build
+      before_deploy:
+        - npm install -g npm@9
+        - gem update --system --force
+        - gem install bundler -v 2.4.22 --no-document
+        - gem install dpl --no-document
+        - ruby -v
+        - gem list | grep uri
+      deploy:
+        provider: npm
+        email: arnold@jasny.net
+        api_key:
+          secure: "CMkqQYh1dciMQLFHahmzfqCjr2A/wVZfEzpS2cCtFwaz96yaXZezWJskkV3P0bgcS1W0YDBzUdoca/HS1n3xOZzF3AaeAHVI1MHsFPilxtkYfC6YiKps09ts9asUxj5oH3YL9Bxak00GM/0/+o5LU6SbHLwqakO2/ffx8cKuKKf8o2xnJaIuy33r8hcfTddu+BMyQNvNyWfpz0T9C7ca5FflowjLTOvMbkcv3u09W/+eE5wrU3M9mKO5Q3v/dgDQBkBBHcvxRxysU6xqIm2YEmfz2w7Al9V/liemSk9UzdiEuVR1wC7OojLRlaKgJ0SeahSBsGJlHVqT+2kYs58a6xp+sCGkd+yfFR2VBzbhCZb/WBKWHckMBUGFoRWUDdhbrwiJAvWJ2VVyUZvVBFpTmFRwQ+M/+gb3zMojMTsovTP5K3150DpJeBbI315BttDZm6uDG7dRkGMVTwzhhC5qvkVw8l/p5If+z9ZTbXTqqaHYkrfOyi1MSa+xCgbj15bvltcF3OXna6bBBCm2AbV33qKpGH1u6utxfr/lme7+ZU9874ak1RX0els+tL+F2ilUJaWsWA7U3Id19fb/S+cRMRtCNNkc0kwzyqaJdTW5lgr3gV3k6lgL12aw4HXf3hMWVaUwD+2dy5AYKXWvE2Dva+ZhIYXoBM44GbnMktMrB0U="
+        on:
+          tags: true
+        skip_cleanup: true
