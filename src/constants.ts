@@ -8,17 +8,10 @@ export const ZERO_HASH =
   "0x0000000000000000000000000000000000000000000000000000000000000000";
 
 // Event and Message versions
-export const EVENT_CHAIN_V1 = 0;
-export const EVENT_CHAIN_V2 = 1;
-export const MESSAGE_V1 = 0;
-export const MESSAGE_V2 = 1;
+export const MESSAGE_V3 = 3;
 
-// Binary and encoding constants
-export const HEX_PREFIX = "0x";
-export const HEX_PREFIX_LENGTH = 2;
-export const BYTES_PER_HEX_CHAR = 2;
+// Hash
 export const HASH_LENGTH = 32; // bytes
-export const ADDRESS_LENGTH = 20; // bytes
 
 // Base Sepolia Testnet
 export const BASE_SEPOLIA = {

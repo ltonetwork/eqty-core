@@ -8,7 +8,7 @@ import {
   IMessageSignable,
 } from "../types/messages";
 import { concatBytes } from "@noble/hashes/utils";
-import { MESSAGE_V1, MESSAGE_V2, HEX_PREFIX, HASH_LENGTH } from "../constants";
+import { MESSAGE_V1, MESSAGE_V3, HEX_PREFIX, HASH_LENGTH } from "../constants";
 
 export default class Message implements IMessageSignable {
   /** Version of the message */
@@ -50,7 +50,7 @@ export default class Message implements IMessageSignable {
 
     this.version =
       meta.title || meta.description || meta.thumbnail
-        ? MESSAGE_V2
+        ? MESSAGE_V3
         : MESSAGE_V1;
     this.meta = { ...this.meta, ...meta };
 
@@ -148,7 +148,7 @@ export default class Message implements IMessageSignable {
     try {
       // Recover signer from signature using ethers.js
       const messageHash = keccak256(this.toBinary(false));
-      const signatureHex = HEX_PREFIX + this.signature.hex;
+      const signatureHex = HEX_PREFIX + this.signature.hexRaw;
       const recoveredAddress = recoverAddress(messageHash, signatureHex);
       return recoveredAddress.toLowerCase() === this.sender.toLowerCase();
     } catch (error) {
@@ -224,7 +224,7 @@ export default class Message implements IMessageSignable {
     switch (this.version) {
       case MESSAGE_V1:
         return this.toBinaryV1(withSignature);
-      case MESSAGE_V2:
+      case MESSAGE_V3:
         return this.toBinaryV2(withSignature);
       default:
         throw new Error(`Message version ${this.version} not supported`);
@@ -294,7 +294,7 @@ export default class Message implements IMessageSignable {
       message.meta.type = new TextDecoder().decode(typeBytes);
       offset += typeLength;
 
-      if (message.version === MESSAGE_V2) {
+      if (message.version === MESSAGE_V3) {
         // Parse title
         const titleLength = data[offset++];
         const titleBytes = data.slice(offset, offset + titleLength);

@@ -1,6 +1,6 @@
 import { Contract, Signer, keccak256 } from "ethers";
 import Binary from "../Binary";
-import { AnchorResult } from "../types/anchor";
+import { AnchorResult } from "../types";
 import {
   BASE_SEPOLIA,
   DEFAULT_CONFIG,
@@ -8,7 +8,6 @@ import {
   NETWORKS,
   ZERO_ADDRESS,
   ZERO_HASH,
-  HEX_PREFIX,
 } from "../constants";
 import { ANCHOR_ABI } from "./AnchorABI";
 
@@ -101,8 +100,8 @@ export default class AnchorClient {
 
       // Convert to the format expected by the Base contract
       const anchorStructs = anchors.map(({ key, value }) => ({
-        key: HEX_PREFIX + key.hex,
-        value: HEX_PREFIX + value.hex,
+        key: key.hex,
+        value: value.hex,
       }));
 
       const tx = await this.contract.anchor(anchorStructs);

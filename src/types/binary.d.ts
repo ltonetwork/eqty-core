@@ -1,10 +1,10 @@
-export interface IBinary {
+export interface IBinary extends Uint8Array {
   base58: string;
   base64: string;
+  hexRaw: string;
   hex: string;
   dataView: DataView;
   hash(): Binary;
-  hmac(key: string | Uint8Array): Binary;
   toString(): string;
   slice(start?: number, end?: number): Binary;
   reverse(): this;

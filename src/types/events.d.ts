@@ -1,5 +1,4 @@
 import { IBinary } from "./binary";
-import { ISigner } from "./signer";
 
 export interface IEventJSON {
   version: number;
@@ -13,10 +12,9 @@ export interface IEventJSON {
   attachments?: Array<{ name: string; mediaType: string; data: string }>;
 }
 
-export interface IEventChainJSON {
+export interface IEventChainJSON extends Record<string, any> {
   id: string;
-  events: IEventJSON[];
-  stateHash?: string;
+  events: Array<IEventJSON | { hash: string; state: string }>;
 }
 
 export interface IEventData {
@@ -27,17 +25,4 @@ export interface IEventAttachment {
   name: string;
   mediaType: string;
   data: IBinary;
-}
-
-export interface IEventConstructor {
-  data: IEventData | string | Uint8Array;
-  mediaType?: string;
-  previous?: string | Uint8Array;
-}
-
-export interface IEventSignable {
-  signWith(signer: ISigner): Promise<this>;
-  verifySignature(): boolean;
-  verifyHash(): boolean;
-  isSigned(): boolean;
 }

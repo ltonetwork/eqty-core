@@ -1,38 +1,39 @@
-import { keccak256, recoverAddress } from "ethers";
-import { ISigner } from "../signer";
+import { Signer, verifyTypedData } from "ethers";
 import Binary from "../Binary";
 import {
   IEventJSON,
   IEventData,
   IEventAttachment,
-  IEventSignable,
-} from "../types/events";
-import EventChain from "./EventChain";
-import { EVENT_CHAIN_V1, EVENT_CHAIN_V2, HEX_PREFIX } from "../constants";
+  IBinary,
+} from "../types";
+import EventChain, { EVENT_CHAIN_V3 } from "./EventChain";
 
-export default class Event implements IEventSignable {
-  private version = EVENT_CHAIN_V2;
+export default class Event {
+  private version = EVENT_CHAIN_V3;
+
+  /** EVM chain id */
+  networkId = 0;
 
   /** Meta type of the data */
   mediaType!: string;
 
   /** Data of the event */
-  data!: Binary;
+  data!: IBinary;
 
   /** Time when the event was signed */
   timestamp?: number;
 
   /** Hash to the previous event */
-  previous?: Binary;
+  previous?: IBinary;
 
   /** Ethereum address of the signer */
   signerAddress?: string;
 
   /** Signature of the event */
-  signature?: Binary;
+  signature?: IBinary;
 
   /** Hash (see dynamic property) */
-  private _hash?: Binary;
+  private _hash?: IBinary;
 
   /** Hash of attachments related to the event */
   readonly attachments: IEventAttachment[] = [];
@@ -60,12 +61,12 @@ export default class Event implements IEventSignable {
   }
 
   private _setData<
-    T extends { mediaType?: string; data?: Binary; name?: string },
+    T extends { mediaType?: string; data?: IBinary; name?: string },
   >(
     data: IEventData | string | Uint8Array,
     mediaType?: string,
     target: T = this as unknown as T
-  ): { mediaType: string; data: Binary } & T {
+  ): { mediaType: string; data: IBinary } & T {
     if (data instanceof Uint8Array) {
       target.mediaType = mediaType ?? "application/octet-stream";
       target.data = data instanceof Binary ? data : new Binary(data);
@@ -80,10 +81,10 @@ export default class Event implements IEventSignable {
       target.data = new Binary(JSON.stringify(data));
     }
 
-    return target as { mediaType: string; data: Binary } & T;
+    return target as { mediaType: string; data: IBinary } & T;
   }
 
-  get hash(): Binary {
+  get hash(): IBinary {
     return this._hash ?? new Binary(this.toBinary()).hash();
   }
 
@@ -100,25 +101,13 @@ export default class Event implements IEventSignable {
       );
 
     switch (this.version) {
-      case EVENT_CHAIN_V1:
-        return this.toBinaryV1();
-      case EVENT_CHAIN_V2:
+      case EVENT_CHAIN_V3:
         return this.toBinaryV2();
       default:
         throw new Error(
           `Event cannot be converted to binary: version ${this.version} not supported`
         );
     }
-  }
-
-  private toBinaryV1(): Uint8Array {
-    return Binary.concat(
-      this.previous!,
-      Binary.from(this.signerAddress!),
-      Binary.fromInt32(this.timestamp || 0),
-      Binary.from(this.mediaType),
-      this.data
-    );
   }
 
   private toBinaryV2(): Uint8Array {
@@ -135,14 +124,36 @@ export default class Event implements IEventSignable {
     if (!this.signature || !this.signerAddress) return false;
 
     try {
-      // Recover signer from signature using ethers.js
-      const binaryData = this.toBinary();
-      const messageHash = keccak256(binaryData);
-      const signatureHex = HEX_PREFIX + this.signature.hex;
-      const recoveredAddress = recoverAddress(messageHash, signatureHex);
-      return (
-        recoveredAddress.toLowerCase() === this.signerAddress.toLowerCase()
-      );
+      const signatureHex = this.signature.hex;
+
+      const domain = {
+        name: "EqtyEvent",
+        version: String(this.version),
+        chainId: this.networkId,
+      };
+
+      const types = {
+        Event: [
+          { name: "version", type: "uint256" },
+          { name: "previous", type: "bytes32" },
+          { name: "signer", type: "address" },
+          { name: "timestamp", type: "uint256" },
+          { name: "mediaType", type: "string" },
+          { name: "dataHash", type: "bytes32" },
+        ],
+      };
+
+      const value = {
+        version: this.version,
+        previous: this.previous!,
+        signer: this.signerAddress!,
+        timestamp: this.timestamp!,
+        mediaType: this.mediaType,
+        dataHash: new Binary(this.data).hash(),
+      };
+
+      const recoveredAddress = verifyTypedData(domain, types, value, signatureHex);
+      return recoveredAddress.toLowerCase() === this.signerAddress!.toLowerCase();
     } catch (error) {
       console.error("Signature verification failed:", error);
       return false;
@@ -159,12 +170,42 @@ export default class Event implements IEventSignable {
     }
   }
 
-  async signWith(signer: ISigner): Promise<this> {
+  async signWith(signer: Signer): Promise<this> {
     try {
       if (!this.timestamp) this.timestamp = Date.now();
       if (!this.signerAddress) this.signerAddress = await signer.getAddress();
 
-      const signature = await signer.sign(this.toBinary());
+      const domain = {
+        name: "EqtyEvent",
+        version: String(this.version),
+        chainId: this.networkId,
+      };
+
+      const types = {
+        Event: [
+          { name: "version", type: "uint256" },
+          { name: "previous", type: "bytes32" },
+          { name: "signer", type: "address" },
+          { name: "timestamp", type: "uint256" },
+          { name: "mediaType", type: "string" },
+          { name: "dataHash", type: "bytes32" },
+        ],
+      };
+
+      const value = {
+        version: this.version,
+        previous: this.previous!,
+        signer: this.signerAddress!,
+        timestamp: this.timestamp!,
+        mediaType: this.mediaType,
+        dataHash: new Binary(this.data).hash(),
+      };
+
+      const anySigner = signer as any;
+      const signature: string = typeof anySigner.signTypedData === "function"
+        ? await anySigner.signTypedData(domain, types, value)
+        : await anySigner._signTypedData(domain, types, value);
+
       this.signature = new Binary(signature);
 
       return this;
@@ -176,7 +217,7 @@ export default class Event implements IEventSignable {
   }
 
   addTo(chain: EventChain): this {
-    chain.addEvent(this);
+    chain.add(this);
     return this;
   }
 
@@ -199,16 +240,16 @@ export default class Event implements IEventSignable {
     return {
       version: this.version,
       mediaType: this.mediaType,
-      data: this.data.base58,
+      data: this.data.base64,
       timestamp: this.timestamp,
-      previous: this.previous?.base58,
+      previous: this.previous?.hex,
       signerAddress: this.signerAddress,
-      signature: this.signature?.base58,
-      hash: this.hash.base58,
+      signature: this.signature?.hex,
+      hash: this.hash.hex,
       attachments: this.attachments.map((att) => ({
         name: att.name,
         mediaType: att.mediaType,
-        data: att.data.base58,
+        data: att.data.hex,
       })),
     };
   }
@@ -216,7 +257,7 @@ export default class Event implements IEventSignable {
   static from(data: IEventJSON, version = 2): Event {
     try {
       const event = new Event(
-        Binary.fromBase58(data.data),
+        Binary.fromBase64(data.data),
         data.mediaType,
         data.previous
       );
@@ -224,15 +265,15 @@ export default class Event implements IEventSignable {
       event.timestamp = data.timestamp;
       event.signerAddress = data.signerAddress;
       event.signature = data.signature
-        ? Binary.fromBase58(data.signature)
+        ? Binary.fromHex(data.signature)
         : undefined;
-      event._hash = data.hash ? Binary.fromBase58(data.hash) : undefined;
+      event._hash = data.hash ? Binary.fromHex(data.hash) : undefined;
 
       if (data.attachments) {
         data.attachments.forEach((att) => {
           event.addAttachment(
             att.name,
-            Binary.fromBase58(att.data),
+            Binary.fromBase64(att.data),
             att.mediaType
           );
         });
