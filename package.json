@@ -1,15 +1,17 @@
 {
   "name": "eqty-core",
-  "version": "1.0.0-alpha.1",
+  "version": "1.0.0-alpha.2",
   "description": "EQTY Core Client Library",
   "type": "module",
-  "main": "lib/index.js",
-  "module": "lib/index.js",
-  "types": "lib/index.d.ts",
-  "files": ["lib"],
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "clean": "rm -rf ./lib",
-    "build": "tsc -p tsconfig.esm.json",
+    "clean": "rm -rf ./dist",
+    "build": "tsup",
     "test": "TS_NODE_PROJECT=tsconfig.test.json mocha -r ts-node/register \"test/**/*.spec.ts\"",
     "lint": "eslint src --ext .ts",
     "lint-fix": "eslint src --ext .ts --fix",
@@ -25,7 +27,7 @@
     "event-chain",
     "messaging"
   ],
-  "author": "EQTY Team",
+  "author": "LTO Network",
   "license": "MIT",
   "dependencies": {
     "@scure/base": "^1.2.6",
@@ -45,6 +47,7 @@
     "prettier": "^3.0.2",
     "ts-node": "^10.9.1",
     "tsconfig-paths": "^4.2.0",
+    "tsup": "^8.5.0",
     "typescript": "^5.1.6"
   },
   "engines": {
