@@ -71,6 +71,10 @@ export default class Message {
   }
 
   private getSignData(): ISignData {
+    if (this.version !== MESSAGE_V3) {
+      throw new Error(`version ${this.version} not supported`);
+    }
+
     if (!this.sender) throw new Error("sender is required");
     if (!this.recipient) throw new Error("recipient is required");
     if (!this.timestamp) throw new Error("timestamp is required");

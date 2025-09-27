@@ -5,6 +5,7 @@ import {
   IEventData,
   IEventAttachment,
   IBinary,
+  ISignData,
 } from "../types";
 import EventChain, { EVENT_CHAIN_V3 } from "./EventChain";
 
@@ -44,11 +45,7 @@ export default class Event {
     previous?: string | Uint8Array
   ) {
     this._setData(data, mediaType);
-    if (previous)
-      this.previous =
-        typeof previous == "string"
-          ? Binary.fromBase58(previous)
-          : new Binary(previous);
+    if (previous) this.previous = typeof previous == "string" ? Binary.fromHex(previous) : new Binary(previous);
   }
 
   addAttachment(
@@ -102,7 +99,7 @@ export default class Event {
 
     switch (this.version) {
       case EVENT_CHAIN_V3:
-        return this.toBinaryV2();
+        return this.toBinaryV3();
       default:
         throw new Error(
           `Event cannot be converted to binary: version ${this.version} not supported`
@@ -110,7 +107,7 @@ export default class Event {
     }
   }
 
-  private toBinaryV2(): Uint8Array {
+  private toBinaryV3(): Uint8Array {
     return Binary.concat(
       this.previous!,
       Binary.from(this.signerAddress!),
@@ -120,39 +117,51 @@ export default class Event {
     );
   }
 
+  private getSignData(): ISignData {
+    if (this.version !== EVENT_CHAIN_V3) {
+      throw new Error(`version ${this.version} not supported`);
+    }
+
+    if (!this.previous) throw new Error("previous is required");
+    if (!this.signerAddress) throw new Error("signer address is required");
+    if (!this.timestamp) throw new Error("timestamp is required");
+
+    const domain = {
+      name: "EqtyEvent",
+      version: String(this.version),
+      chainId: this.networkId,
+    };
+
+    const types = {
+      Event: [
+        { name: "version", type: "uint256" },
+        { name: "previous", type: "bytes32" },
+        { name: "signer", type: "address" },
+        { name: "timestamp", type: "uint256" },
+        { name: "mediaType", type: "string" },
+        { name: "dataHash", type: "bytes32" },
+      ],
+    };
+
+    const value = {
+      version: this.version,
+      previous: this.previous!,
+      signer: this.signerAddress!,
+      timestamp: this.timestamp!,
+      mediaType: this.mediaType,
+      dataHash: new Binary(this.data).hash(),
+    };
+
+    return { domain, types, value };
+  }
+
   verifySignature(): boolean {
     if (!this.signature || !this.signerAddress) return false;
 
     try {
-      const signatureHex = this.signature.hex;
+      const { domain, types, value } = this.getSignData();
 
-      const domain = {
-        name: "EqtyEvent",
-        version: String(this.version),
-        chainId: this.networkId,
-      };
-
-      const types = {
-        Event: [
-          { name: "version", type: "uint256" },
-          { name: "previous", type: "bytes32" },
-          { name: "signer", type: "address" },
-          { name: "timestamp", type: "uint256" },
-          { name: "mediaType", type: "string" },
-          { name: "dataHash", type: "bytes32" },
-        ],
-      };
-
-      const value = {
-        version: this.version,
-        previous: this.previous!,
-        signer: this.signerAddress!,
-        timestamp: this.timestamp!,
-        mediaType: this.mediaType,
-        dataHash: new Binary(this.data).hash(),
-      };
-
-      const recoveredAddress = verifyTypedData(domain, types, value, signatureHex);
+      const recoveredAddress = verifyTypedData(domain, types, value, this.signature.hex);
       return recoveredAddress.toLowerCase() === this.signerAddress!.toLowerCase();
     } catch (error) {
       console.error("Signature verification failed:", error);
@@ -171,49 +180,15 @@ export default class Event {
   }
 
   async signWith(signer: Signer): Promise<this> {
-    try {
-      if (!this.timestamp) this.timestamp = Date.now();
-      if (!this.signerAddress) this.signerAddress = await signer.getAddress();
+    if (!this.timestamp) this.timestamp = Date.now();
+    if (!this.signerAddress) this.signerAddress = await signer.getAddress();
 
-      const domain = {
-        name: "EqtyEvent",
-        version: String(this.version),
-        chainId: this.networkId,
-      };
+    const { domain, types, value } = this.getSignData();
 
-      const types = {
-        Event: [
-          { name: "version", type: "uint256" },
-          { name: "previous", type: "bytes32" },
-          { name: "signer", type: "address" },
-          { name: "timestamp", type: "uint256" },
-          { name: "mediaType", type: "string" },
-          { name: "dataHash", type: "bytes32" },
-        ],
-      };
+    const signature = await signer.signTypedData(domain, types, value);
+    this.signature = new Binary(signature);
 
-      const value = {
-        version: this.version,
-        previous: this.previous!,
-        signer: this.signerAddress!,
-        timestamp: this.timestamp!,
-        mediaType: this.mediaType,
-        dataHash: new Binary(this.data).hash(),
-      };
-
-      const anySigner = signer as any;
-      const signature: string = typeof anySigner.signTypedData === "function"
-        ? await anySigner.signTypedData(domain, types, value)
-        : await anySigner._signTypedData(domain, types, value);
-
-      this.signature = new Binary(signature);
-
-      return this;
-    } catch (error) {
-      throw new Error(
-        `Failed to sign event: ${error instanceof Error ? error.message : "Unknown error"}`
-      );
-    }
+    return this;
   }
 
   addTo(chain: EventChain): this {
