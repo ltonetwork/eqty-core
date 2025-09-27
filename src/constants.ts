@@ -7,12 +7,6 @@ export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 export const ZERO_HASH =
   "0x0000000000000000000000000000000000000000000000000000000000000000";
 
-// Event and Message versions
-export const MESSAGE_V3 = 3;
-
-// Hash
-export const HASH_LENGTH = 32; // bytes
-
 // Base Sepolia Testnet
 export const BASE_SEPOLIA = {
   CHAIN_ID: 84532,

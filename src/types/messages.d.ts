@@ -1,5 +1,3 @@
-import { ISigner } from "./signer";
-
 export interface IMessageMeta {
   type: string;
   title?: string;
@@ -17,25 +15,10 @@ export interface IMessageJSON {
   signature?: string;
   recipient?: string;
   hash?: string;
-  encryptedData?: string;
 }
 
 export interface IMessageData {
   [key: string]: string | number | boolean | object | Array<any>;
-}
-
-export interface IMessageConstructor {
-  data: IMessageData | string | Uint8Array;
-  mediaType?: string;
-  meta?: Partial<IMessageMeta> | string;
-}
-
-export interface IMessageSignable {
-  signWith(signer: ISigner): Promise<this>;
-  verifySignature(): boolean;
-  verifyHash(): boolean;
-  isSigned(): boolean;
-  isEncrypted(): boolean;
 }
 
 export interface IRelayMessage {

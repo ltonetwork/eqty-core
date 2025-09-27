@@ -1,18 +1,17 @@
-import { keccak256, recoverAddress } from "ethers";
-import { ISigner } from "../signer";
+import { Signer, verifyTypedData } from "ethers";
 import Binary from "../Binary";
 import {
   IMessageMeta,
   IMessageJSON,
   IMessageData,
-  IMessageSignable,
-} from "../types/messages";
-import { concatBytes } from "@noble/hashes/utils";
-import { MESSAGE_V1, MESSAGE_V3, HEX_PREFIX, HASH_LENGTH } from "../constants";
+  ISignData,
+} from "../types";
 
-export default class Message implements IMessageSignable {
+const MESSAGE_V3 = 3;
+
+export default class Message {
   /** Version of the message */
-  version: number;
+  version = MESSAGE_V3;
 
   /** Extra info and details about the message */
   meta: IMessageMeta = { type: "basic", title: "", description: "" };
@@ -38,20 +37,12 @@ export default class Message implements IMessageSignable {
   /** Hash (see dynamic property) */
   private _hash?: Binary;
 
-  /** Encrypted data */
-  private _encryptedData?: Binary;
-
   constructor(
     data: IMessageData | string | Uint8Array,
     mediaType?: string,
     meta: Partial<IMessageMeta> | string = {}
   ) {
     if (typeof meta === "string") meta = { type: meta }; // Backwards compatibility
-
-    this.version =
-      meta.title || meta.description || meta.thumbnail
-        ? MESSAGE_V3
-        : MESSAGE_V1;
     this.meta = { ...this.meta, ...meta };
 
     if (typeof data === "string") {
@@ -68,17 +59,8 @@ export default class Message implements IMessageSignable {
     }
   }
 
-  get type(): string {
-    return this.meta.type; // Backwards compatibility
-  }
-
   get hash(): Binary {
     return this._hash ?? new Binary(this.toBinary(false)).hash();
-  }
-
-  get encryptedData(): Binary {
-    if (!this._encryptedData) throw new Error("Message is not encrypted");
-    return this._encryptedData;
   }
 
   to(recipient: string): Message {
@@ -88,54 +70,54 @@ export default class Message implements IMessageSignable {
     return this;
   }
 
-  encryptFor(recipientAddress: string): Message {
+  private getSignData(): ISignData {
+    if (!this.sender) throw new Error("sender is required");
+    if (!this.recipient) throw new Error("recipient is required");
+    if (!this.timestamp) throw new Error("timestamp is required");
+
+    const domain = {
+      name: "EqtyMessage",
+      version: String(this.version),
+    };
+
+    const types = {
+      Message: [
+        { name: "version", type: "uint256" },
+        { name: "sender", type: "address" },
+        { name: "recipient", type: "address" },
+        { name: "timestamp", type: "uint256" },
+        { name: "mediaType", type: "string" },
+        { name: "dataHash", type: "bytes32" },
+        { name: "metaHash", type: "bytes32" },
+      ],
+    };
+
+    const metaHash = new Binary(JSON.stringify(this.meta)).hash();
+    const value = {
+      version: this.version,
+      sender: this.sender!,
+      recipient: this.recipient!,
+      timestamp: this.timestamp!,
+      mediaType: this.mediaType,
+      dataHash: new Binary(this.data).hash(),
+      metaHash,
+    };
+
+    return { domain, types, value };
+  }
+
+  async signWith(sender: Signer): Promise<this> {
     if (this.signature) throw new Error("Message is already signed");
 
-    this.recipient = recipientAddress;
+    this.sender = await sender.getAddress();
+    this.timestamp = Date.now();
 
-    // For now, implement a simplified encryption approach
-    // In a full implementation, you would use proper ECIES encryption
-    // This is a placeholder that demonstrates the pattern
-    const messageData = this.data;
-    const recipientHash = new Binary(recipientAddress).hash();
-    const encrypted = concatBytes(messageData, recipientHash);
-    this._encryptedData = new Binary(encrypted);
+    const { domain, types, value } = this.getSignData();
+    const signature: string = await sender.signTypedData(domain, types, value);
+
+    this.signature = new Binary(signature);
 
     return this;
-  }
-
-  decryptWith(_signer: ISigner): Message {
-    if (!this._encryptedData) throw new Error("Message is not encrypted");
-
-    // Simplified decryption - in production use proper ECIES
-    const encryptedData = this._encryptedData;
-    const dataLength = encryptedData.length - HASH_LENGTH; // Remove recipient hash
-    this.data = new Binary(encryptedData.slice(0, dataLength));
-    this._encryptedData = undefined;
-
-    return this;
-  }
-
-  isEncrypted(): boolean {
-    return !!this._encryptedData;
-  }
-
-  async signWith(sender: ISigner): Promise<this> {
-    try {
-      if (this.signature) throw new Error("Message is already signed");
-
-      this.sender = await sender.getAddress();
-      this.timestamp = Date.now();
-
-      const signature = await sender.sign(this.toBinary(false));
-      this.signature = new Binary(signature);
-
-      return this;
-    } catch (error) {
-      throw new Error(
-        `Failed to sign message: ${error instanceof Error ? error.message : "Unknown error"}`
-      );
-    }
   }
 
   isSigned(): boolean {
@@ -145,55 +127,21 @@ export default class Message implements IMessageSignable {
   verifySignature(): boolean {
     if (!this.signature || !this.sender) return false;
 
-    try {
-      // Recover signer from signature using ethers.js
-      const messageHash = keccak256(this.toBinary(false));
-      const signatureHex = HEX_PREFIX + this.signature.hexRaw;
-      const recoveredAddress = recoverAddress(messageHash, signatureHex);
-      return recoveredAddress.toLowerCase() === this.sender.toLowerCase();
-    } catch (error) {
-      console.error("Message signature verification failed:", error);
-      return false;
-    }
+    const { domain, types, value } = this.getSignData();
+    const recoveredAddress = verifyTypedData(domain, types, value, this.signature.hex);
+    return recoveredAddress.toLowerCase() === this.sender!.toLowerCase();
   }
 
   verifyHash(): boolean {
     try {
       const computedHash = new Binary(this.toBinary(false)).hash();
-      return this.hash.toString() === computedHash.toString();
+      return this.hash.hex === computedHash.hex;
     } catch (error) {
-      console.error("Message hash verification failed:", error);
       return false;
     }
   }
 
-  private toBinaryV1(withSignature = true): Uint8Array {
-    const parts: Uint8Array[] = [
-      Binary.fromInt32(this.version),
-      Binary.from(this.mediaType),
-      this.data,
-    ];
-
-    if (this.timestamp) {
-      parts.push(Binary.fromInt32(this.timestamp));
-    }
-
-    if (this.sender) {
-      parts.push(Binary.from(this.sender));
-    }
-
-    if (this.recipient) {
-      parts.push(Binary.from(this.recipient));
-    }
-
-    if (withSignature && this.signature) {
-      parts.push(this.signature);
-    }
-
-    return Binary.concat(...parts);
-  }
-
-  private toBinaryV2(withSignature = true): Uint8Array {
+  private toBinaryV3(withSignature = true): Uint8Array {
     const parts: Uint8Array[] = [
       Binary.fromInt32(this.version),
       Binary.from(JSON.stringify(this.meta)),
@@ -222,10 +170,8 @@ export default class Message implements IMessageSignable {
 
   toBinary(withSignature = true): Uint8Array {
     switch (this.version) {
-      case MESSAGE_V1:
-        return this.toBinaryV1(withSignature);
       case MESSAGE_V3:
-        return this.toBinaryV2(withSignature);
+        return this.toBinaryV3(withSignature);
       default:
         throw new Error(`Message version ${this.version} not supported`);
     }
@@ -242,15 +188,11 @@ export default class Message implements IMessageSignable {
       signature: this.signature?.base58,
       recipient: this.recipient,
       hash: this.hash.base58,
-      encryptedData: this._encryptedData?.base58,
     };
   }
 
   static from(data: IMessageJSON | Uint8Array): Message {
-    if (data instanceof Uint8Array) {
-      return Message.fromBinary(data);
-    }
-    return Message.fromJSON(data);
+    return (data instanceof Uint8Array) ? Message.fromBinary(data) : Message.fromJSON(data);
   }
 
   private static fromJSON(json: IMessageJSON): Message {
@@ -263,14 +205,9 @@ export default class Message implements IMessageSignable {
       message.version = json.version;
       message.timestamp = json.timestamp;
       message.sender = json.sender;
-      message.signature = json.signature
-        ? Binary.fromBase58(json.signature)
-        : undefined;
+      message.signature = json.signature ? Binary.fromBase58(json.signature) : undefined;
       message.recipient = json.recipient;
       message._hash = json.hash ? Binary.fromBase58(json.hash) : undefined;
-      message._encryptedData = json.encryptedData
-        ? Binary.fromBase58(json.encryptedData)
-        : undefined;
 
       return message;
     } catch (error) {
@@ -281,86 +218,82 @@ export default class Message implements IMessageSignable {
   }
 
   private static fromBinary(data: Uint8Array): Message {
-    try {
-      const message = new Message("", "text/plain");
-      let offset = 0;
+    const message = new Message("", "text/plain");
+    let offset = 0;
 
-      // Parse version
-      message.version = data[offset++];
+    // Parse version
+    message.version = data[offset++];
 
-      // Parse meta type
-      const typeLength = data[offset++];
-      const typeBytes = data.slice(offset, offset + typeLength);
-      message.meta.type = new TextDecoder().decode(typeBytes);
-      offset += typeLength;
-
-      if (message.version === MESSAGE_V3) {
-        // Parse title
-        const titleLength = data[offset++];
-        const titleBytes = data.slice(offset, offset + titleLength);
-        message.meta.title = new TextDecoder().decode(titleBytes);
-        offset += titleLength;
-
-        // Parse description (2 bytes for length)
-        const descLength = (data[offset] << 8) | data[offset + 1];
-        offset += 2;
-        const descBytes = data.slice(offset, offset + descLength);
-        message.meta.description = new TextDecoder().decode(descBytes);
-        offset += descLength;
-      }
-
-      // Parse media type
-      const mediaTypeLength = (data[offset] << 8) | data[offset + 1];
-      offset += 2;
-      const mediaTypeBytes = data.slice(offset, offset + mediaTypeLength);
-      message.mediaType = new TextDecoder().decode(mediaTypeBytes);
-      offset += mediaTypeLength;
-
-      // Parse data
-      const dataLength =
-        (data[offset] << 24) |
-        (data[offset + 1] << 16) |
-        (data[offset + 2] << 8) |
-        data[offset + 3];
-      offset += 4;
-      message.data = new Binary(data.slice(offset, offset + dataLength));
-      offset += dataLength;
-
-      // Parse timestamp
-      const timestampBytes = data.slice(offset, offset + 8);
-      message.timestamp = Number(
-        new DataView(
-          timestampBytes.buffer,
-          timestampBytes.byteOffset,
-          8
-        ).getBigUint64(0, false)
-      );
-      offset += 8;
-
-      // Parse sender address
-      const senderLength = data[offset++];
-      const senderBytes = data.slice(offset, offset + senderLength);
-      message.sender = new TextDecoder().decode(senderBytes);
-      offset += senderLength;
-
-      // Parse recipient address
-      const recipientLength = data[offset++];
-      const recipientBytes = data.slice(offset, offset + recipientLength);
-      message.recipient = new TextDecoder().decode(recipientBytes);
-      offset += recipientLength;
-
-      // Parse signature if present
-      if (offset < data.length) {
-        const signatureLength = data[offset++];
-        const signatureBytes = data.slice(offset, offset + signatureLength);
-        message.signature = new Binary(signatureBytes);
-      }
-
-      return message;
-    } catch (error) {
-      throw new Error(
-        `Failed to create message from binary: ${error instanceof Error ? error.message : "Unknown error"}`
-      );
+    if (message.version !== MESSAGE_V3) {
+      throw new Error(`Message version ${message.version} not supported`);
     }
+
+    // Parse meta type
+    const typeLength = data[offset++];
+    const typeBytes = data.slice(offset, offset + typeLength);
+    message.meta.type = new TextDecoder().decode(typeBytes);
+    offset += typeLength;
+
+    // Parse title
+    const titleLength = data[offset++];
+    const titleBytes = data.slice(offset, offset + titleLength);
+    message.meta.title = new TextDecoder().decode(titleBytes);
+    offset += titleLength;
+
+    // Parse description (2 bytes for length)
+    const descLength = (data[offset] << 8) | data[offset + 1];
+    offset += 2;
+    const descBytes = data.slice(offset, offset + descLength);
+    message.meta.description = new TextDecoder().decode(descBytes);
+    offset += descLength;
+
+    // Parse media type
+    const mediaTypeLength = (data[offset] << 8) | data[offset + 1];
+    offset += 2;
+    const mediaTypeBytes = data.slice(offset, offset + mediaTypeLength);
+    message.mediaType = new TextDecoder().decode(mediaTypeBytes);
+    offset += mediaTypeLength;
+
+    // Parse data
+    const dataLength =
+      (data[offset] << 24) |
+      (data[offset + 1] << 16) |
+      (data[offset + 2] << 8) |
+      data[offset + 3];
+    offset += 4;
+    message.data = new Binary(data.slice(offset, offset + dataLength));
+    offset += dataLength;
+
+    // Parse timestamp
+    const timestampBytes = data.slice(offset, offset + 8);
+    message.timestamp = Number(
+      new DataView(
+        timestampBytes.buffer,
+        timestampBytes.byteOffset,
+        8
+      ).getBigUint64(0, false)
+    );
+    offset += 8;
+
+    // Parse sender address
+    const senderLength = data[offset++];
+    const senderBytes = data.slice(offset, offset + senderLength);
+    message.sender = new TextDecoder().decode(senderBytes);
+    offset += senderLength;
+
+    // Parse recipient address
+    const recipientLength = data[offset++];
+    const recipientBytes = data.slice(offset, offset + recipientLength);
+    message.recipient = new TextDecoder().decode(recipientBytes);
+    offset += recipientLength;
+
+    // Parse signature if present
+    if (offset < data.length) {
+      const signatureLength = data[offset++];
+      const signatureBytes = data.slice(offset, offset + signatureLength);
+      message.signature = new Binary(signatureBytes);
+    }
+
+    return message;
   }
 }
