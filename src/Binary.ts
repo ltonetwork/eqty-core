@@ -20,7 +20,7 @@ export default class Binary extends Uint8Array implements IBinary {
   }
 
   get base64(): string {
-    return btoa(String.fromCharCode(...this));
+    return base64.encode(this);
   }
 
   get hexRaw(): string {
