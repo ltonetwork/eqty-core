@@ -9,6 +9,7 @@ import {
   VerifyFn,
 } from "../types";
 import EventChain, { EVENT_CHAIN_V3 } from "./EventChain";
+import { isBinary } from "../utils/bytes"
 
 export default class Event {
   private version = EVENT_CHAIN_V3;
@@ -65,8 +66,7 @@ export default class Event {
     mediaType?: string,
     target: T = this as unknown as T
   ): { mediaType: string; data: IBinary } & T {
-    // noinspection SuspiciousTypeOfGuard
-    if (data instanceof Uint8Array) {
+    if (isBinary(data)) {
       target.mediaType = mediaType ?? "application/octet-stream";
       target.data = data instanceof Binary ? data : new Binary(data);
     } else if (typeof data === "string") {

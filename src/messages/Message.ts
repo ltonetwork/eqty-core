@@ -5,6 +5,7 @@ import {
   IMessageData,
   ISignData, ISigner, VerifyFn,
 } from "../types";
+import { isBinary } from "../utils/bytes"
 
 const MESSAGE_V3 = 3;
 
@@ -47,8 +48,7 @@ export default class Message {
     if (typeof data === "string") {
       this.mediaType = mediaType ?? "text/plain";
       this.data = new Binary(data);
-    // noinspection SuspiciousTypeOfGuard
-    } else if (data instanceof Uint8Array) {
+    } else if (isBinary(data)) {
       this.mediaType = mediaType ?? "application/octet-stream";
       this.data = data instanceof Binary ? data : new Binary(data);
     } else {
@@ -195,8 +195,7 @@ export default class Message {
   }
 
   static from(data: IMessageJSON | Uint8Array): Message {
-    // noinspection SuspiciousTypeOfGuard
-    return (data instanceof Uint8Array) ? Message.fromBinary(data) : Message.fromJSON(data);
+    return isBinary(data) ? Message.fromBinary(data) : Message.fromJSON(data);
   }
 
   private static fromJSON(json: IMessageJSON): Message {

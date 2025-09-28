@@ -8,6 +8,7 @@ import {
 } from "../constants";
 import { ANCHOR_ABI } from "./AnchorABI";
 import { AnchorContract } from "../types"
+import { isBinary } from "../utils/bytes"
 
 /**
  * Simplified AnchorClient for blockchain anchoring
@@ -21,14 +22,12 @@ export default class AnchorClient<T> {
     input: Array<{ key: Uint8Array; value: Uint8Array }> | Array<Uint8Array> | Uint8Array,
     value?: Uint8Array
   ): { key: string; value: string }[] {
-    // noinspection SuspiciousTypeOfGuard
-    if (input instanceof Uint8Array) {
+    if (isBinary(input)) {
       return [{ key: new Binary(input).hex, value: new Binary(value).hex ?? ZERO_HASH }];
     }
 
-    // noinspection SuspiciousTypeOfGuard
     return input.map((item) =>
-      item instanceof Uint8Array
+      isBinary(item)
         ? { key: new Binary(item).hex, value: ZERO_HASH }
         : { key: new Binary(item.key).hex, value: new Binary(item.value).hex },
     );
