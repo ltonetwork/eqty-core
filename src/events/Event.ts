@@ -65,6 +65,7 @@ export default class Event {
     mediaType?: string,
     target: T = this as unknown as T
   ): { mediaType: string; data: IBinary } & T {
+    // noinspection SuspiciousTypeOfGuard
     if (data instanceof Uint8Array) {
       target.mediaType = mediaType ?? "application/octet-stream";
       target.data = data instanceof Binary ? data : new Binary(data);

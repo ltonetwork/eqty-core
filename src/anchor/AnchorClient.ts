@@ -21,14 +21,17 @@ export default class AnchorClient<T> {
     input: Array<{ key: Uint8Array; value: Uint8Array }> | Array<Uint8Array> | Uint8Array,
     value?: Uint8Array
   ): { key: string; value: string }[] {
+    // noinspection SuspiciousTypeOfGuard
     if (input instanceof Uint8Array) {
       return [{ key: new Binary(input).hex, value: new Binary(value).hex ?? ZERO_HASH }];
     }
 
-    return input.map(
-      (item) => item instanceof Uint8Array
+    // noinspection SuspiciousTypeOfGuard
+    return input.map((item) =>
+      item instanceof Uint8Array
         ? { key: new Binary(item).hex, value: ZERO_HASH }
-        : { key: new Binary(item.key).hex, value: new Binary(item.value).hex });
+        : { key: new Binary(item.key).hex, value: new Binary(item.value).hex },
+    );
   }
 
   /**

@@ -37,32 +37,38 @@ const { chainId: networkId } = await provider.getNetwork();
 
 // Create an event chain
 const chain = EventChain.create(address, networkId)
-  .withVerification((address, ...args) => verifyTypedData(...args).toLowerCase() === address.toLowerCase());
+  .withVerification((address, domain, types, value, signature) =>
+    verifyTypedData(domain, types as any, value, signature).toLowerCase() === address.toLowerCase()
+  );
 
 // Create event and add to chain
-const event = new Event({ message: "Hello EQTY!" }, "application/json")
-  .addTo(chain);
+const event = new Event({ message: "Hello EQTY!" }, "application/json").addTo(chain);
 
 // Sign event
 await event.signWith(signer);
 
-// Create anchor client
-const contract = new Contract(BASE_ANCHOR_CONTRACT, AnchorClient.ABI, signer);
-const anchorClient = new AnchorClient(contract);
+// Create anchor client using the network-specific contract address
+const contract = new Contract(
+  AnchorClient.contractAddress(Number(networkId)),
+  AnchorClient.ABI,
+  signer,
+);
+const anchorClient = new AnchorClient(contract as any);
 
 // Anchor chain map
-await anchorClient.anchor(chain.anchorMap);
+await anchorClient.anchor(chain.anchorMap());
 ```
 
 ### Messaging
 
 ```typescript
-import { Message, Relay } from "eqty-core";
+import { Message, AnchorClient } from "eqty-core";
 import { BrowserProvider, Contract } from "ethers";
 
 // Connect to wallet
 const provider = new BrowserProvider(window.ethereum);
 const signer = await provider.getSigner();
+const { chainId: networkId } = await provider.getNetwork();
 
 // Create a message
 const message = new Message("Hello from EQTY!", "text/plain", {
@@ -70,23 +76,20 @@ const message = new Message("Hello from EQTY!", "text/plain", {
   title: "Welcome Message",
 });
 
-// Sign the message
+// Set recipient (optional) and sign the message
+// message.to("0xRecipientAddress");
 await message.signWith(signer);
 
 // Create anchor client
 const contract = new Contract(
-  AnchorClient.contractAddress(networkId),
+  AnchorClient.contractAddress(Number(networkId)),
   AnchorClient.ABI,
   signer,
 );
-const anchorClient = new AnchorClient(contract);
+const anchorClient = new AnchorClient(contract as any);
 
 // Anchor message hash to blockchain
 await anchorClient.anchor(message.hash);
-
-// Send via relay (relay verifies anchor independently)
-const relay = new Relay("https://relay.eqty.com");
-await relay.send(message);
 ```
 
 ## Quick Start with Viem
@@ -96,15 +99,10 @@ await relay.send(message);
 ```typescript
 import { Event, EventChain, AnchorClient, ViemSigner, ViemContract } from "eqty-core";
 import { createWalletClient, createPublicClient, custom, recoverTypedDataAddress } from "viem";
-import { base, baseSepolia } from "viem/chains";
+import { baseSepolia } from "viem/chains";
 
 // Request accounts and set up viem wallet client with an account
 const [address] = (await window.ethereum.request({ method: "eth_requestAccounts" })) as string[];
-
-const publicClient = createPublicClient({
-  chain: walletClient.chain!,
-  transport: custom(window.ethereum),
-});
 
 const walletClient = createWalletClient({
   account: address as `0x${string}`,
@@ -112,15 +110,22 @@ const walletClient = createWalletClient({
   transport: custom(window.ethereum),
 });
 
+const publicClient = createPublicClient({
+  chain: baseSepolia,
+  transport: custom(window.ethereum),
+});
+
 // Create an EQTY signer for viem
 const signer = new ViemSigner(walletClient);
 
 // Create an event chain
-const networkId = walletClient.chain!.id;
-const chain = EventChain.create(address, networkId)
-  .withVerification((address, domain, types, value, signature) =>
-    verifyTypedData({ address, domain, types, message: value, signature })
-  );
+const networkId = baseSepolia.id;
+const chain = EventChain.create(address, networkId).withVerification(
+  async (signerAddress, domain, types, value, signature) => {
+    const recovered = await recoverTypedDataAddress({ domain, types, message: value, signature });
+    return recovered.toLowerCase() === signerAddress.toLowerCase();
+  }
+);
 
 // Create event and add to chain
 const event = new Event({ message: "Hello EQTY!" }, "application/json").addTo(chain);
@@ -129,40 +134,39 @@ const event = new Event({ message: "Hello EQTY!" }, "application/json").addTo(ch
 await event.signWith(signer);
 
 // Set up ViemContract and AnchorClient
-const contract = new ViemAnchorContract(
+const contract = new ViemContract(
   publicClient,
   walletClient,
   AnchorClient.contractAddress(networkId),
 );
-const anchorClient = new AnchorClient(contract);
+const anchorClient = new AnchorClient(contract as any);
 
 // Anchor chain map
-await anchorClient.anchor(chain.anchorMap);
+await anchorClient.anchor(chain.anchorMap());
 ```
 
 ### Messaging
 
 ```typescript
-import { Message, Relay, ViemSigner, ViemContract } from "eqty-core";
+import { Message, AnchorClient, ViemSigner, ViemContract } from "eqty-core";
 import { createWalletClient, createPublicClient, custom } from "viem";
 import { baseSepolia } from "viem/chains";
 
-// Set up viem wallet client and signer as above
+// Set up viem wallet/public clients
 const [address] = (await window.ethereum.request({ method: "eth_requestAccounts" })) as string[];
-
-const publicClient = createPublicClient({
-  chain: walletClient.chain!,
-  transport: custom(window.ethereum),
-});
 
 const walletClient = createWalletClient({
   account: address as `0x${string}`,
   chain: baseSepolia,
   transport: custom(window.ethereum),
 });
-const signer = new ViemSigner(client);
+const publicClient = createPublicClient({
+  chain: baseSepolia,
+  transport: custom(window.ethereum),
+});
 
-const networkId = walletClient.chain!.id;
+const signer = new ViemSigner(walletClient);
+const networkId = baseSepolia.id;
 
 // Create a message
 const message = new Message("Hello from EQTY!", "text/plain", {
@@ -170,185 +174,175 @@ const message = new Message("Hello from EQTY!", "text/plain", {
   title: "Welcome Message",
 });
 
-// Sign the message
+// Optionally set recipient and sign
+// message.to("0xRecipientAddress");
 await message.signWith(signer);
 
 // Set up ViemContract and AnchorClient
-const contract = new ViemAnchorContract(
+const contract = new ViemContract(
   publicClient,
   walletClient,
   AnchorClient.contractAddress(networkId)
 );
-const anchorClient = new AnchorClient(contract);
+const anchorClient = new AnchorClient(contract as any);
 
 // Anchor message hash to blockchain
 await anchorClient.anchor(message.hash);
-
-// Send via relay (relay verifies anchor independently)
-const relay = new Relay("https://relay.eqty.com");
-await relay.send(message);
 ```
 
 ## API Reference
 
 ### Core Classes
 
-#### `Event`
-
+#### Event
 Represents a single event in an event chain.
 
 ```typescript
 class Event {
   constructor(data: any, mediaType?: string, previous?: string | Uint8Array);
 
-  async signWith(signer: ISigner): Promise<this>;
-  verifySignature(): boolean;
+  // Build and read
+  addAttachment(name: string, data: Uint8Array, mediaType: string): this;
+  addTo(chain: EventChain): this;
+  get parsedData(): any;
   toJSON(): IEventJSON;
-  static from(data: IEventJSON): Event;
+
+  // Signing & verification
+  async signWith(signer: ISigner): Promise<this>;
+  async verifySignature(verify: VerifyFn): Promise<boolean>;
+  verifyHash(): boolean;
+
+  // Static helpers
+  static from(json: IEventJSON, defaultVersion?: number): Event;
 }
 ```
 
-#### `EventChain`
-
+#### EventChain
 Manages a chain of cryptographically linked events.
 
 ```typescript
 class EventChain {
-  constructor(id: string);
+  // Factory
+  static create(address: string, networkId: number, nonce?: Uint8Array): EventChain;
+  withVerification(verify: VerifyFn): this;
 
+  // Compose
+  add(eventOrChain: Event | EventChain): this;
   addEvent(event: Event): this;
-  getAnchorMap(): Array<{ key: Binary; value: Binary }>;
-  verify(): boolean;
-  get stateHash(): Binary;
+  addChain(chain: EventChain): this;
+  has(event: Event): boolean;
+
+  // State
+  latestHash(): Uint8Array | undefined;
+  initialHash(): Uint8Array | undefined;
+  latestEvent(): Event | undefined;
+  state(): Uint8Array;
+  initialState(): Uint8Array;
+  stateAt(length: number): Uint8Array;
+  isSigned(): boolean;
+
+  // Validation and metadata
+  validate(): void;
+  isCreatedBy(address: string, networkId: number): boolean;
+
+  // Anchoring
+  anchorMap(): Array<{ key: Uint8Array; value: Uint8Array }>;
+
+  // Serialization
+  toJSON(): IEventChainJSON;
+  static from(json: IEventChainJSON): EventChain;
 }
 ```
 
-#### `Message`
-
-Represents an encrypted message with metadata.
+#### Message
+Represents a message with optional metadata that can be signed and anchored.
 
 ```typescript
 class Message {
   constructor(data: any, mediaType?: string, meta?: IMessageMeta);
 
-  async signWith(signer: ISigner): Promise<Message>;
+  hash(): Uint8Array;
   to(recipient: string): Message;
-  encryptFor(recipientAddress: string): Message;
-  verifySignature(): boolean;
+
+  // Signing & verification
+  async signWith(sender: ISigner): Promise<this>;
+  isSigned(): boolean;
+  async verifySignature(verify: VerifyFn): Promise<boolean>;
+  verifyHash(): boolean;
+
+  // Binary/JSON
+  toJSON(): IMessageJSON;
+  static fromJSON(json: IMessageJSON): Message;
+  static fromBinary(data: Uint8Array): Message;
 }
 ```
 
-#### `Relay`
-
-Handles message routing and delivery.
-
-```typescript
-class Relay {
-  constructor(url: string);
-
-  async send(message: Message): Promise<Message>;
-  async getMessages(
-    recipient: string,
-    limit?: number,
-    offset?: number
-  ): Promise<Message[]>;
-}
-```
-
-#### `AnchorClient`
-
-Interfaces with the Base smart contract for anchoring with full fee management.
+#### AnchorClient
+Interfaces with the Base Anchor smart contract. You pass in a contract adapter that implements anchor() and maxAnchors().
 
 ```typescript
-class AnchorClient {
-  constructor(contractAddress: string, signer: Signer);
+class AnchorClient<T> {
+  static readonly ABI: any;
+  static contractAddress(networkId: number): `0x${string}`;
 
-  // Core anchoring methods
-  async anchor(key: Binary, value: Binary): Promise<AnchorResult>;
-  async anchorMany(
-    anchors: Array<{ key: Binary; value: Binary }>
-  ): Promise<AnchorResult>;
-  async anchorEventChain(
-    chainId: string,
-    stateHash: Binary
-  ): Promise<AnchorResult>;
-  async anchorMessage(messageHash: Binary): Promise<AnchorResult>;
+  constructor(contract: AnchorContract<T>);
 
-  // Fee management
-  async getAnchorFee(): Promise<bigint>;
-  async getEqtyTokenAddress(): Promise<string>;
-  async requiresFee(): Promise<boolean>;
-  async getTotalFee(anchorCount: number): Promise<bigint>;
-  async hasSufficientBalance(anchorCount: number): Promise<boolean>;
-  async hasSufficientAllowance(anchorCount: number): Promise<boolean>;
+  // Anchor 1 or many entries (Uint8Array inputs)
+  anchor(input: Array<{ key: Uint8Array; value: Uint8Array }>): Promise<T>;
+  anchor(key: Uint8Array, value: Uint8Array): Promise<T>;
+  anchor(value: Array<Uint8Array>): Promise<T>;
+  anchor(value: Uint8Array): Promise<T>;
 
-  // Validation
-  getMaxAnchorsPerTx(): number;
-  validateAnchorCount(anchorCount: number): void;
-}
-```
-
-### Signer Interface
-
-#### `ISigner`
-
-Abstract interface for wallet signing.
-
-```typescript
-interface ISigner {
-  getAddress(): Promise<string>;
-  sign(data: Uint8Array): Promise<Uint8Array>;
-  signMessage(message: string | Uint8Array): Promise<string>;
-}
-```
-
-#### `EthersSigner`
-
-Ethers.js implementation of the signer interface.
-
-```typescript
-class EthersSigner implements ISigner {
-  constructor(signer: Signer);
+  // Limits
+  getMaxAnchors(): Promise<number>;
 }
 ```
 
 ### Binary Utilities
 
-#### `Binary`
-
+#### Binary
 Extended Uint8Array with blockchain-specific functionality.
 
 ```typescript
 class Binary extends Uint8Array {
+  // Encodings
   get base58(): string;
   get base64(): string;
-  get hex(): string;
+  get hex(): string; // 0x-prefixed
+  get hexRaw(): string; // without 0x
+
+  // Hashing
   hash(): Binary;
-  static fromHex(value: string): Binary;
+
+  // Construction
+  static from(value: string | ArrayLike<number> | Iterable<any>): Binary;
   static fromBase58(value: string): Binary;
+  static fromBase64(value: string): Binary;
+  static fromHex(value: string): Binary;
+  static fromMultibase(value: string): Binary;
+
+  // Numbers (big-endian)
+  static fromInt16(value: number): Binary;
+  static fromInt32(value: number): Binary;
+
+  // Utilities
   static concat(...items: Array<ArrayLike<number>>): Binary;
 }
 ```
 
-## Smart Contract Integration
+### Viem helpers
 
-The library is perfectly aligned with the ownables-base Anchor contract:
+```typescript
+class ViemSigner<T extends IViemAccount> implements ISigner {
+  constructor(client: IViemWalletClient<T>);
+  getAddress(): Promise<string>;
+  signTypedData(domain, types, value): Promise<string>;
+}
 
-```solidity
-contract Anchor is IAnchor, Ownable2Step {
-    struct Anchor {
-        bytes32 key;
-        bytes32 value;
-    }
-
-    event Anchored(bytes32 indexed key, bytes32 value, address indexed sender, uint64 timestamp);
-
-    function anchor(Anchor[] calldata anchors) external {
-        // Handles EQTY token fees and emits events for each anchor
-    }
-
-    function anchorFee() external view returns (uint256);
-    function eqtyToken() external view returns (address);
+class ViemContract<T extends IViemAccount> {
+  constructor(publicClient: IViemPublicClient, walletClient: IViemWalletClient<T>, address: `0x${string}`);
+  anchor(anchors: Array<{ key: `0x${string}`; value: `0x${string}` }>): Promise<void>;
+  maxAnchors(): Promise<number>;
 }
 ```
 
@@ -363,7 +357,7 @@ This library replaces the following LTO components:
 | `messages/Message`  | `Message`        | Wallet-native authentication                                 |
 | `messages/Relay`    | `Relay`          | Simplified for Base compatibility                            |
 | `Binary`            | `Binary`         | Ported with minimal changes                                  |
-| `LTO.anchor`        | `AnchorClient`   | Replaced with helper class to anchor using an smart contract |
+| `LTO.anchor()`      | `AnchorClient`   | Replaced with helper class to anchor using an smart contract |
 
 ## Development
 

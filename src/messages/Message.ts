@@ -47,6 +47,7 @@ export default class Message {
     if (typeof data === "string") {
       this.mediaType = mediaType ?? "text/plain";
       this.data = new Binary(data);
+    // noinspection SuspiciousTypeOfGuard
     } else if (data instanceof Uint8Array) {
       this.mediaType = mediaType ?? "application/octet-stream";
       this.data = data instanceof Binary ? data : new Binary(data);
@@ -194,6 +195,7 @@ export default class Message {
   }
 
   static from(data: IMessageJSON | Uint8Array): Message {
+    // noinspection SuspiciousTypeOfGuard
     return (data instanceof Uint8Array) ? Message.fromBinary(data) : Message.fromJSON(data);
   }
 
