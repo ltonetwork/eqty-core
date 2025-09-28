@@ -4,52 +4,14 @@
 
 // Common constants
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-export const ZERO_HASH =
-  "0x0000000000000000000000000000000000000000000000000000000000000000";
+export const ZERO_HASH = "0x0000000000000000000000000000000000000000000000000000000000000000";
 
 // Base Sepolia Testnet
-export const BASE_SEPOLIA = {
-  CHAIN_ID: 84532,
-  RPC_URL: "https://sepolia.base.org",
-  EXPLORER_URL: "https://sepolia.basescan.org",
-
-  // Contract addresses
-  ANCHOR_CONTRACT: "0x7607af0cea78815c71bbea90110b2c218879354b",
-  EQTY_TOKEN: ZERO_ADDRESS, // Not deployed on testnet yet
-
-  // Current configuration (as deployed)
-  ANCHOR_FEE: 0n, // No fee on testnet
-  MAX_ANCHORS_PER_TX: 100,
-} as const;
+export const BASE_SEPOLIA_CHAIN_ID = 84532;
+export const BASE_SEPOLIA_ANCHOR_CONTRACT = "0x7607af0cea78815c71bbea90110b2c218879354b"
+export const BASE_SEPOLIA_EQTY_TOKEN = ZERO_ADDRESS; // Not deployed yet
 
 // Base Mainnet
-export const BASE_MAINNET = {
-  CHAIN_ID: 8453,
-  RPC_URL: "https://mainnet.base.org",
-  EXPLORER_URL: "https://basescan.org",
-
-  // Contract addresses (to be deployed)
-  ANCHOR_CONTRACT: ZERO_ADDRESS, // Not deployed yet
-  EQTY_TOKEN: ZERO_ADDRESS, // Not deployed yet
-
-  // Configuration (to be set)
-  ANCHOR_FEE: 0n, // To be configured
-  MAX_ANCHORS_PER_TX: 100,
-} as const;
-
-// Default configuration
-export const DEFAULT_CONFIG = {
-  ANCHOR_FEE: 0n,
-  MAX_ANCHORS_PER_TX: 100,
-  GAS_LIMIT: 500000n, // Estimated gas limit for anchoring
-  DEFAULT_MESSAGE_LIMIT: 50,
-  DEFAULT_MESSAGE_OFFSET: 0,
-} as const;
-
-// Network configuration
-export const NETWORKS = {
-  "base-sepolia": BASE_SEPOLIA,
-  "base-mainnet": BASE_MAINNET,
-} as const;
-
-export type NetworkName = keyof typeof NETWORKS;
+export const BASE_CHAIN_ID = 8453;
+export const BASE_ANCHOR_CONTRACT = ZERO_ADDRESS; // Not deployed yet
+export const BASE_EQTY_TOKEN = ZERO_ADDRESS;

@@ -1,25 +1,6 @@
-// Main exports
 export { default as Binary } from "./Binary";
-
-// Events
-export { Event, EventChain } from "./events";
-
-// Messages
-export { Message, Relay } from "./messages";
-
-// Signer
-export type { ISigner } from "./signer";
-export { EthersSigner, PrivateKeySigner } from "./signer";
-
-// Anchor
-export { AnchorClient } from "./anchor";
-export type { AnchorResult } from "./anchor";
-export type { AnchorClientConfig } from "./anchor/AnchorClient";
-
-// Constants
+export * from "./events";
+export * from "./messages";
+export * from "./anchor";
+export * from "./viem";
 export * from "./constants";
-
-// Types - export specific types as needed
-export type { IBinary } from "./types/binary";
-export type { IEventJSON, IEventData } from "./types/events";
-export type { IMessageJSON, IMessageMeta } from "./types/messages";

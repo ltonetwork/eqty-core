@@ -1,4 +1,3 @@
-import { Signer, verifyTypedData } from "ethers";
 import Binary from "../Binary";
 import {
   IEventJSON,
@@ -6,6 +5,8 @@ import {
   IEventAttachment,
   IBinary,
   ISignData,
+  ISigner,
+  VerifyFn,
 } from "../types";
 import EventChain, { EVENT_CHAIN_V3 } from "./EventChain";
 
@@ -155,16 +156,13 @@ export default class Event {
     return { domain, types, value };
   }
 
-  verifySignature(): boolean {
+  async verifySignature(verify: VerifyFn): Promise<boolean> {
     if (!this.signature || !this.signerAddress) return false;
 
     try {
       const { domain, types, value } = this.getSignData();
-
-      const recoveredAddress = verifyTypedData(domain, types, value, this.signature.hex);
-      return recoveredAddress.toLowerCase() === this.signerAddress!.toLowerCase();
-    } catch (error) {
-      console.error("Signature verification failed:", error);
+      return verify(this.signerAddress!, domain, types, value, this.signature.hex);
+    } catch {
       return false;
     }
   }
@@ -173,13 +171,12 @@ export default class Event {
     try {
       const computedHash = new Binary(this.toBinary()).hash();
       return this.hash.toString() === computedHash.toString();
-    } catch (error) {
-      console.error("Hash verification failed:", error);
+    } catch {
       return false;
     }
   }
 
-  async signWith(signer: Signer): Promise<this> {
+  async signWith(signer: ISigner): Promise<this> {
     if (!this.timestamp) this.timestamp = Date.now();
     if (!this.signerAddress) this.signerAddress = await signer.getAddress();
 

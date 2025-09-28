@@ -1,4 +1,4 @@
-import { keccak256 } from "ethers";
+import { keccak_256 } from "@noble/hashes/sha3";
 import { base58, base64, hex } from "@scure/base";
 
 import { IBinary } from "./types";
@@ -36,8 +36,8 @@ export default class Binary extends Uint8Array implements IBinary {
   }
 
   hash(): Binary {
-    const hashHex = keccak256(this);
-    return Binary.fromHex(hashHex);
+    const hashBytes = keccak_256(this);
+    return new Binary(hashBytes);
   }
 
   toString(): string {

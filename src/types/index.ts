@@ -4,3 +4,4 @@ export * from "./binary";
 export * from "./events";
 export * from "./messages";
 export * from "./signer";
+export * from "./viem";

@@ -1,10 +1,12 @@
-import { keccak256, randomBytes, sha256 } from "ethers";
+import { sha256 } from "@noble/hashes/sha2";
+import { keccak_256 } from "@noble/hashes/sha3";
+import { randomBytes } from "@noble/hashes/utils";
 import Event from "./Event";
 import Binary from "../Binary";
-import { IBinary, IEventChainJSON, IEventJSON } from "../types"
-import { compareBytes } from "../utils/bytes"
 import MergeConflict from "./MergeConflict"
-import { BASE_MAINNET } from "../constants"
+import { compareBytes } from "../utils/bytes"
+import { IBinary, IEventChainJSON, IEventJSON, VerifyFn } from "../types"
+import { BASE_CHAIN_ID } from "../constants"
 
 export const EVENT_CHAIN_V3 = 0x42;
 const DERIVED_ID_V2 = 0x52;
@@ -12,6 +14,7 @@ const DERIVED_ID_V2 = 0x52;
 export default class EventChain {
   readonly id: string;
   readonly networkId: number;
+  private verifyFn?: VerifyFn;
 
   events: Array<Event> = [];
   private partial?: { hash: IBinary; state: IBinary };
@@ -21,11 +24,17 @@ export default class EventChain {
     this.networkId = Binary.fromHex(this.id).dataView.getInt32(1);
   }
 
-  static create(address: string, network = BASE_MAINNET.CHAIN_ID, nonce?: string | Uint8Array): EventChain {
+  static create(address: string, network = BASE_CHAIN_ID, nonce?: string | Uint8Array): EventChain {
     const nonceBytes = typeof nonce !== 'undefined' ? EventChain.createNonce(nonce) : EventChain.getRandomNonce();
 
     const id = EventChain.buildId(EVENT_CHAIN_V3, network, Binary.fromHex(address), nonceBytes);
     return new EventChain(id);
+  }
+
+  withVerification(verifyFn: VerifyFn)
+  {
+    this.verifyFn = verifyFn;
+    return this;
   }
 
   get version(): number {
@@ -59,7 +68,7 @@ export default class EventChain {
     event.networkId = this.networkId;
     (event as any).version = this.version;
 
-    this.assertEvent(event);
+    this.assertEventFits(event);
     this.events.push(event);
   }
 
@@ -76,7 +85,7 @@ export default class EventChain {
 
     for (const [index, event] of chain.events.entries()) {
       if (!this.events[offset + index]) {
-        this.assertEvent(event);
+        this.assertEventFits(event);
         this.events.push(event);
       } else if (this.events[offset + index].hash.hex !== event.hash.hex) {
         throw new MergeConflict(this, this.events[offset + index], chain.events[index]);
@@ -120,24 +129,19 @@ export default class EventChain {
     return this.events.slice(0, length).reduce((state, event) => Binary.concat(state, event.hash).hash(), initial);
   }
 
-  protected assertEvent(event: Event): void {
+  protected assertEventFits(event: Event): void {
     if (!event.previous || event.previous.hex != this.latestHash.hex)
       throw new Error(`Event doesn't fit onto the chain after ${this.latestHash.hex}`);
-
-    if (!event.verifyHash()) throw new Error(`Invalid hash of event ${event.hash.hex}`);
-
-    if (event.isSigned() && !event.verifySignature())
-      throw new Error(`Invalid signature of event ${event.hash.hex}`);
   }
 
-  validate(): void {
+  async validate(): Promise<void> {
     if (this.events.length === 0) throw new Error('No events on event chain');
 
-    this.validateEvents();
+    await this.validateEvents();
     if (this.events[0]?.previous?.hex === this.initialHash.hex) this.validateGenesis();
   }
 
-  private validateEvents(): void {
+  private async validateEvents(): Promise<void> {
     let previous = this.partial?.hash ?? this.initialHash;
 
     for (const event of this.events) {
@@ -152,7 +156,8 @@ export default class EventChain {
       }
 
       if (!event.verifyHash()) throw new Error(`Invalid hash of event ${event.hash.hex}`);
-      if (!event.verifySignature()) throw new Error(`Invalid signature of event ${event.hash.hex}`);
+      if (this.verifyFn && !(await event.verifySignature(this.verifyFn)))
+        throw new Error(`Invalid signature of event ${event.hash.hex}`);
       if (previous.hex !== event.previous?.hex)
         throw new Error(`Event ${event.hash.hex} doesn't fit onto the chain`);
 
@@ -255,7 +260,8 @@ export default class EventChain {
   }
 
   protected static createNonce(input: string | Uint8Array): Uint8Array {
-    return Uint8Array.from(sha256(input).slice(0, 20));
+    const bytes = typeof input === 'string' ? new TextEncoder().encode(input) : input;
+    return sha256(bytes).slice(0, 20);
   }
 
   protected static getRandomNonce(): Uint8Array {
@@ -268,9 +274,9 @@ export default class EventChain {
     const prefixBytes = Uint8Array.from([prefix]);
     const networkBytes = Binary.fromInt32(network);
 
-    const publicKeyHashPart = Binary.fromHex(keccak256(group)).slice(0, 20);
+    const publicKeyHashPart = new Binary(keccak_256(group)).slice(0, 20);
     const rawId = Binary.concat(prefixBytes, networkBytes, randomBytes, publicKeyHashPart);
-    const addressHash = Binary.from(keccak256(rawId)).slice(0, 4);
+    const addressHash = new Binary(keccak_256(rawId)).slice(0, 4);
 
     return '0x' + Binary.concat(rawId, addressHash).hex;
   }
@@ -284,13 +290,13 @@ export default class EventChain {
 
     const rawId = idBytes.slice(0, 42);
     const check = idBytes.slice(42);
-    const addressHash = Binary.from(keccak256(rawId)).slice(0, 4);
+    const addressHash = new Binary(keccak_256(rawId)).slice(0, 4);
 
     let res = compareBytes(check, addressHash);
 
     if (res && group) {
       const keyBytes = rawId.slice(22);
-      const publicKeyHashPart = Uint8Array.from(keccak256(group).slice(0, 20));
+      const publicKeyHashPart = keccak_256(group).slice(0, 20);
 
       res = compareBytes(keyBytes, publicKeyHashPart);
     }

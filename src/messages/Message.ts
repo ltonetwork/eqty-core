@@ -1,10 +1,9 @@
-import { Signer, verifyTypedData } from "ethers";
 import Binary from "../Binary";
 import {
   IMessageMeta,
   IMessageJSON,
   IMessageData,
-  ISignData,
+  ISignData, ISigner, VerifyFn,
 } from "../types";
 
 const MESSAGE_V3 = 3;
@@ -110,7 +109,7 @@ export default class Message {
     return { domain, types, value };
   }
 
-  async signWith(sender: Signer): Promise<this> {
+  async signWith(sender: ISigner): Promise<this> {
     if (this.signature) throw new Error("Message is already signed");
 
     this.sender = await sender.getAddress();
@@ -128,12 +127,11 @@ export default class Message {
     return !!this.signature;
   }
 
-  verifySignature(): boolean {
+  async verifySignature(verify: VerifyFn): Promise<boolean> {
     if (!this.signature || !this.sender) return false;
 
     const { domain, types, value } = this.getSignData();
-    const recoveredAddress = verifyTypedData(domain, types, value, this.signature.hex);
-    return recoveredAddress.toLowerCase() === this.sender!.toLowerCase();
+    return await verify(this.sender, domain, types, value, this.signature.hex);
   }
 
   verifyHash(): boolean {
