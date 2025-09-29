@@ -23,7 +23,8 @@ export default class AnchorClient<T> {
     value?: Uint8Array
   ): { key: string; value: string }[] {
     if (isBinary(input)) {
-      return [{ key: new Binary(input).hex, value: new Binary(value).hex ?? ZERO_HASH }];
+      const anchorValue = value !== undefined ? new Binary(value).hex : ZERO_HASH;
+      return [{ key: new Binary(input).hex, value: anchorValue }];
     }
 
     return input.map((item) =>
@@ -54,7 +55,21 @@ export default class AnchorClient<T> {
    * Get the maximum number of anchors allowed per transaction
    */
   async getMaxAnchors(): Promise<number> {
-    return await this.contract.maxAnchors();
+    const result = await this.contract.maxAnchors();
+
+    if (typeof result === "bigint") {
+      return Number(result);
+    }
+
+    if (typeof result === "number") {
+      return result;
+    }
+
+    if (typeof (result as { toString(): string }).toString === "function") {
+      return Number((result as { toString(): string }).toString());
+    }
+
+    throw new TypeError("Unsupported maxAnchors return type");
   }
 
   /**
