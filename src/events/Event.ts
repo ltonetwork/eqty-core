@@ -200,7 +200,7 @@ export default class Event {
     const { domain, types, value } = this.getSignData();
 
     const signature = await signer.signTypedData(domain, types, value);
-    this.signature = new Binary(signature);
+    this.signature = Binary.fromHex(signature);
 
     return this;
   }
