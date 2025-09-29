@@ -5,7 +5,7 @@ import Event from "../../src/events/Event";
 import EventChain, { EVENT_CHAIN_V3 } from "../../src/events/EventChain";
 import Binary from "../../src/Binary";
 import { ViemSigner } from "../../src/viem";
-import type { IViemWalletClient, IViemAccount } from "../../src/types/viem";
+import type { IViemWalletClient, IViemAccount } from "../../src/types";
 
 const PRIVATE_KEY_A = `0x${"11".repeat(32)}`;
 const PRIVATE_KEY_B = `0x${"22".repeat(32)}`;
@@ -14,7 +14,7 @@ const createWallet = (key: string) => new Wallet(key);
 const toAddress = (wallet: Wallet) => wallet.address.toLowerCase() as `0x${string}`;
 
 const createVerifyWithEthers = () =>
-  (address: string, domain: any, types: any, value: any, signature: string) =>
+  async (address: string, domain: any, types: any, value: any, signature: string) =>
     verifyTypedData(domain, types, normalizeMessage(value), signature).toLowerCase() ===
     address.toLowerCase();
 
@@ -134,11 +134,11 @@ describe("Event", () => {
 
   it("signs with viem signer and validates signature", async () => {
     const wallet = createWallet(PRIVATE_KEY_B);
-    const account: IViemAccount = { address: wallet.address as `0x${string}` };
+    const account: IViemAccount = { address: wallet.address };
     const client: IViemWalletClient<IViemAccount> = {
       account,
       signTypedData: async ({ domain, types, message }) =>
-        wallet.signTypedData(domain, types as any, normalizeMessage(message)) as `0x${string}`,
+        wallet.signTypedData(domain, types, normalizeMessage(message)),
       writeContract: async () => "0x",
     };
 
@@ -157,7 +157,7 @@ describe("Event", () => {
 
   it("returns false for verification errors or missing data", async () => {
     const event = new Event("data");
-    expect(await event.verifySignature(() => true)).toBe(false);
+    expect(await event.verifySignature(async () => true)).toBe(false);
 
     event.previous = Binary.fromHex(`0x${"00".repeat(32)}`);
     event.signerAddress = createWallet(PRIVATE_KEY_A).address;

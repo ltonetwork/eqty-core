@@ -4,6 +4,7 @@ import EventChain from "../../src/events/EventChain";
 import Event from "../../src/events/Event";
 import Binary from "../../src/Binary";
 import MergeConflict from "../../src/events/MergeConflict";
+import { IEventJSON } from "../../src"
 
 const PRIVATE_KEY_A = `0x${"11".repeat(32)}`;
 const PRIVATE_KEY_B = `0x${"22".repeat(32)}`;
@@ -16,12 +17,12 @@ const normalizeValue = (value: any) => ({
 });
 
 const verifyWithEthers = () =>
-  (address: string, domain: any, types: any, value: any, signature: string) =>
+  async (address: string, domain: any, types: any, value: any, signature: string) =>
     verifyTypedData(domain, types, normalizeValue(value), signature).toLowerCase() ===
     address.toLowerCase();
 const toAddress = (wallet: Wallet) => wallet.address.toLowerCase() as `0x${string}`;
 
-const signEvent = async (chain: EventChain, wallet: Wallet, data: any) => {
+const addAndSignEvent = async (chain: EventChain, wallet: Wallet, data: any) => {
   const event = new Event(data).addTo(chain);
   await event.signWith(wallet);
   return event;
@@ -50,9 +51,9 @@ describe("EventChain", () => {
     const address = toAddress(wallet);
     expect(address).toMatch(/^0x[0-9a-f]+$/);
     const chain = EventChain.create(address, 1, "meta");
-    const event = await signEvent(chain, wallet, { step: 1 });
+    const event = await addAndSignEvent(chain, wallet, { step: 1 });
 
-    expect(event.previous?.hex).toBe(chain.toJSON().events[0]!.previous);
+    expect(event.previous?.hex).toBe((chain.toJSON().events[0] as IEventJSON).previous);
     expect(event.networkId).toBe(chain.networkId);
     expect(chain.has(event.hash)).toBe(true);
   });
@@ -89,19 +90,19 @@ describe("EventChain", () => {
     const address = toAddress(wallet);
     expect(address).toMatch(/^0x[0-9a-f]+$/);
     const chain = EventChain.create(address, 1, "merge");
-    await signEvent(chain, wallet, { idx: 0 });
-    await signEvent(chain, wallet, { idx: 1 });
+    await addAndSignEvent(chain, wallet, { idx: 0 });
+    await addAndSignEvent(chain, wallet, { idx: 1 });
 
     const clone = EventChain.from(chain.toJSON());
-    await signEvent(clone, wallet, { idx: 2 });
+    await addAndSignEvent(clone, wallet, { idx: 2 });
 
     chain.add(clone);
     expect(chain.events).toHaveLength(3);
 
     const conflictA = EventChain.create(address, 1, "conflict");
     const conflictB = EventChain.create(address, 1, "conflict");
-    await signEvent(conflictA, wallet, { c: "a" });
-    const eventB = await signEvent(conflictB, wallet, { c: "b" });
+    await addAndSignEvent(conflictA, wallet, { c: "a" });
+    const eventB = await addAndSignEvent(conflictB, wallet, { c: "b" });
 
     expect(() => conflictA.add(conflictB)).toThrow(MergeConflict);
     expect(eventB.previous?.hex).toBe(conflictB.events[0]?.previous?.hex);
@@ -112,11 +113,11 @@ describe("EventChain", () => {
     const address = toAddress(wallet);
     expect(address).toMatch(/^0x[0-9a-f]+$/);
     const chain = EventChain.create(address, 10, "partial");
-    await signEvent(chain, wallet, { idx: 0 });
-    await signEvent(chain, wallet, { idx: 1 });
+    await addAndSignEvent(chain, wallet, { idx: 0 });
+    await addAndSignEvent(chain, wallet, { idx: 1 });
 
     const partial = chain.startingAfter(chain.events[0]!);
-    await signEvent(partial, wallet, { idx: 2 });
+    await addAndSignEvent(partial, wallet, { idx: 2 });
 
     chain.add(partial);
     expect(chain.events).toHaveLength(3);
@@ -142,8 +143,8 @@ describe("EventChain", () => {
 
     expect(chain.latestHash.hex).toBe(Binary.fromHex(chain.id).hash().hex);
 
-    const ev1 = await signEvent(chain, wallet, { index: 1 });
-    const ev2 = await signEvent(chain, wallet, { index: 2 });
+    await addAndSignEvent(chain, wallet, { index: 1 });
+    const ev2 = await addAndSignEvent(chain, wallet, { index: 2 });
 
     expect(chain.latestHash.hex).toBe(ev2.hash.hex);
 
@@ -172,8 +173,8 @@ describe("EventChain", () => {
     const addressA = toAddress(walletA);
     expect(addressA).toMatch(/^0x[0-9a-f]+$/);
     const chain = EventChain.create(addressA, 100, "validate");
-    await signEvent(chain, walletA, { id: 0 });
-    await signEvent(chain, walletA, { id: 1 });
+    await addAndSignEvent(chain, walletA, { id: 0 });
+    await addAndSignEvent(chain, walletA, { id: 1 });
 
     await expect(chain.validate(verify)).resolves.toBeUndefined();
 
@@ -185,14 +186,14 @@ describe("EventChain", () => {
     await expect(unsigned.validate(verify)).rejects.toThrow(/is not signed/);
 
     const invalidHashChain = EventChain.create(addressA, 100, "hash-invalid");
-    const tampered = await signEvent(invalidHashChain, walletA, { bad: true });
+    const tampered = await addAndSignEvent(invalidHashChain, walletA, { bad: true });
     Reflect.set(tampered, "_hash", new Binary(new Uint8Array(32).fill(1)));
     await expect(invalidHashChain.validate(verify)).rejects.toThrow(
       /Invalid hash/,
     );
 
     const invalidSigChain = EventChain.create(addressA, 100, "sig-invalid");
-    const ev = await signEvent(invalidSigChain, walletA, { ok: true });
+    const ev = await addAndSignEvent(invalidSigChain, walletA, { ok: true });
     ev.signature = new Binary(new Uint8Array(65));
     await expect(invalidSigChain.validate(verify)).rejects.toThrow(
       /Invalid signature/,
@@ -210,7 +211,7 @@ describe("EventChain", () => {
     );
 
     const genesisChain = EventChain.create(addressA, 100, "genesis");
-    await signEvent(genesisChain, walletB, { ok: true });
+    await addAndSignEvent(genesisChain, walletB, { ok: true });
     await expect(genesisChain.validate(verify)).rejects.toThrow(
       "Genesis event is not signed by chain creator",
     );
@@ -221,8 +222,8 @@ describe("EventChain", () => {
     const address = toAddress(wallet);
     expect(address).toMatch(/^0x[0-9a-f]+$/);
     const chain = EventChain.create(address, 777, "slice");
-    const first = await signEvent(chain, wallet, { i: 0 });
-    const second = await signEvent(chain, wallet, { i: 1 });
+    const first = await addAndSignEvent(chain, wallet, { i: 0 });
+    await addAndSignEvent(chain, wallet, { i: 1 });
 
     expect(chain.isSigned()).toBe(true);
 
@@ -243,8 +244,8 @@ describe("EventChain", () => {
     const address = toAddress(wallet);
     expect(address).toMatch(/^0x[0-9a-f]+$/);
     const chain = EventChain.create(address, 88, "anchor");
-    const ev1 = await signEvent(chain, wallet, { a: 1 });
-    const ev2 = await signEvent(chain, wallet, { a: 2 });
+    const ev1 = await addAndSignEvent(chain, wallet, { a: 1 });
+    await addAndSignEvent(chain, wallet, { a: 2 });
 
     const map = chain.anchorMap;
     expect(map).toHaveLength(2);
@@ -262,8 +263,8 @@ describe("EventChain", () => {
     const address = toAddress(wallet);
     expect(address).toMatch(/^0x[0-9a-f]+$/);
     const chain = EventChain.create(address, 55, "serialize");
-    await signEvent(chain, wallet, { s: 1 });
-    await signEvent(chain, wallet, { s: 2 });
+    await addAndSignEvent(chain, wallet, { s: 1 });
+    await addAndSignEvent(chain, wallet, { s: 2 });
 
     const binary = chain.toBinary();
     const fromBinary = EventChain.from(binary);

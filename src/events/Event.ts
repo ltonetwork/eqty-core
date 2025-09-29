@@ -178,7 +178,7 @@ export default class Event {
 
     try {
       const { domain, types, value } = this.getSignData();
-      return verify(this.signerAddress!, domain, types, value, this.signature.hex);
+      return await verify(this.signerAddress!, domain, types, value, this.signature.hex);
     } catch {
       return false;
     }
@@ -193,7 +193,7 @@ export default class Event {
     }
   }
 
-  async signWith(signer: ISigner): Promise<this> {
+  async signWith(signer: ISigner): Promise<void> {
     if (!this.timestamp) this.timestamp = Date.now();
     if (!this.signerAddress) this.signerAddress = await signer.getAddress();
 
@@ -201,8 +201,6 @@ export default class Event {
 
     const signature = await signer.signTypedData(domain, types, value);
     this.signature = Binary.fromHex(signature);
-
-    return this;
   }
 
   addTo(chain: EventChain): this {

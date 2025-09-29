@@ -1,12 +1,12 @@
 import { ITypedDataDomain, ITypedDataField } from "./signer"
 
 export interface IViemAccount {
-  address: `0x${string}`;
+  address: string;
 }
 
 interface IViemRequest<TAccount extends IViemAccount> {
   account: TAccount,
-  address: `0x${string}`,
+  address: string,
   abi: any,
   functionName: string,
   args?: any[],
@@ -18,12 +18,12 @@ export interface IViemWalletClient<TAccount extends IViemAccount> {
   signTypedData(args: {
     account: TAccount;
     domain: ITypedDataDomain;
-    types: Record<string, readonly ITypedDataField[]>;
+    types: Record<string, ITypedDataField[]>;
     primaryType: string;
     message: any;
-  }): Promise<`0x${string}`>;
+  }): Promise<string>;
 
-  writeContract(args: IViemRequest<TAccount>): Promise<`0x${string}`>;
+  writeContract(args: IViemRequest<TAccount>): Promise<string>;
 }
 
 export interface IViemPublicClient {
@@ -32,7 +32,7 @@ export interface IViemPublicClient {
   ): Promise<{ result: any, request: IViemRequest<TAccount> }>;
 
   readContract(args: {
-    address: `0x${string}`,
+    address: string,
     abi: any,
     functionName: string,
     args?: any[],
