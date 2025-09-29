@@ -3,6 +3,7 @@
   "version": "1.0.0-alpha.2",
   "description": "EQTY Core Client Library",
   "type": "module",
+  "sideEffects": false,
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -12,10 +13,10 @@
   "scripts": {
     "clean": "rm -rf ./dist",
     "build": "tsup",
-    "test": "TS_NODE_PROJECT=tsconfig.test.json mocha -r ts-node/register \"test/**/*.spec.ts\"",
+    "test": "vitest run",
     "lint": "eslint src --ext .ts",
     "lint-fix": "eslint src --ext .ts --fix",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\""
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\""
   },
   "keywords": [
     "eqty",
@@ -35,7 +36,6 @@
   },
   "devDependencies": {
     "@types/chai": "^4.3.5",
-    "@types/mocha": "^10.0.10",
     "@types/node": "^20.5.0",
     "@typescript-eslint/eslint-plugin": "^6.4.0",
     "@typescript-eslint/parser": "^6.4.0",
@@ -44,13 +44,13 @@
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-prettier": "^5.0.0",
     "ethers": "^6.8.0",
-    "mocha": "^10.2.0",
     "prettier": "^3.0.2",
     "ts-node": "^10.9.1",
     "tsconfig-paths": "^4.2.0",
     "tsup": "^8.5.0",
     "typescript": "^5.1.6",
-    "viem": "^2.37.8"
+    "viem": "^2.37.8",
+    "vitest": "^2.1.1"
   },
   "engines": {
     "node": ">=16.0.0"
