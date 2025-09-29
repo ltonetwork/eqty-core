@@ -1,40 +1,20 @@
-import { ITypedDataDomain, ITypedDataField } from "./signer"
+import type {
+  Account,
+  Chain,
+  PublicClient,
+  Transport,
+  WalletClient,
+} from "viem";
 
-export interface IViemAccount {
-  address: `0x${string}`;
-}
+export type IViemAccount = Account;
 
-interface IViemRequest<TAccount extends IViemAccount> {
-  account: TAccount,
-  address: `0x${string}`,
-  abi: any,
-  functionName: string,
-  args?: any[],
-}
+export type IViemPublicClient<
+  TTransport extends Transport = Transport,
+  TChain extends Chain | undefined = Chain | undefined,
+> = Pick<PublicClient<TTransport, TChain>, "simulateContract" | "readContract">;
 
-export interface IViemWalletClient<TAccount extends IViemAccount> {
-  account?: TAccount;
-
-  signTypedData(args: {
-    account: TAccount;
-    domain: ITypedDataDomain;
-    types: Record<string, readonly ITypedDataField[]>;
-    primaryType: string;
-    message: any;
-  }): Promise<`0x${string}`>;
-
-  writeContract(args: IViemRequest<TAccount>): Promise<`0x${string}`>;
-}
-
-export interface IViemPublicClient {
-  simulateContract<TAccount extends IViemAccount>(
-    args: IViemRequest<TAccount>,
-  ): Promise<{ result: any, request: IViemRequest<TAccount> }>;
-
-  readContract(args: {
-    address: `0x${string}`,
-    abi: any,
-    functionName: string,
-    args?: any[],
-  }): Promise<any>;
-}
+export type IViemWalletClient<
+  TAccount extends IViemAccount | undefined = IViemAccount | undefined,
+  TTransport extends Transport = Transport,
+  TChain extends Chain | undefined = Chain | undefined,
+> = Pick<WalletClient<TTransport, TChain, TAccount>, "account" | "signTypedData" | "writeContract">;

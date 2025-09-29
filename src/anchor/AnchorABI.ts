@@ -19,6 +19,13 @@ export const ANCHOR_ABI = [
     type: "function",
   },
   {
+    inputs: [],
+    name: "maxAnchors",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
     anonymous: false,
     inputs: [
       { indexed: true, name: "key", type: "bytes32" },
