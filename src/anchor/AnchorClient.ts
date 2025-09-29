@@ -23,7 +23,7 @@ export default class AnchorClient<T> {
     value?: Uint8Array
   ): { key: string; value: string }[] {
     if (isBinary(input)) {
-      return [{ key: new Binary(input).hex, value: new Binary(value).hex ?? ZERO_HASH }];
+      return [{ key: new Binary(input).hex, value: value ? new Binary(value).hex : ZERO_HASH }];
     }
 
     return input.map((item) =>
@@ -54,7 +54,8 @@ export default class AnchorClient<T> {
    * Get the maximum number of anchors allowed per transaction
    */
   async getMaxAnchors(): Promise<number> {
-    return await this.contract.maxAnchors();
+    const value = await this.contract.maxAnchors();
+    return typeof value === 'bigint' ? Number(value) : value;
   }
 
   /**
