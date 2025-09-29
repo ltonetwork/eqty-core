@@ -4,19 +4,19 @@ export interface IBinary extends Uint8Array {
   hexRaw: string;
   hex: string;
   dataView: DataView;
-  hash(): Binary;
+  hash(): IBinary;
   toString(): string;
-  slice(start?: number, end?: number): Binary;
+  slice(start?: number, end?: number): IBinary;
   reverse(): this;
-  toReversed(): Binary;
+  toReversed(): IBinary;
 }
 
 export interface IBinaryConstructor {
-  fromHex(value: string): Binary;
-  fromBase58(value: string): Binary;
-  fromBase64(value: string): Binary;
-  fromMultibase(value: string): Binary;
-  fromInt16(value: number): Binary;
-  fromInt32(value: number): Binary;
-  concat(...items: Array<ArrayLike<number>>): Binary;
+  fromHex(value: string): IBinary;
+  fromBase58(value: string): IBinary;
+  fromBase64(value: string): IBinary;
+  fromMultibase(value: string): IBinary;
+  fromInt16(value: number): IBinary;
+  fromInt32(value: number): IBinary;
+  concat(...items: Array<ArrayLike<number>>): IBinary;
 }

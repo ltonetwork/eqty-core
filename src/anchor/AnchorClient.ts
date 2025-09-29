@@ -55,7 +55,7 @@ export default class AnchorClient<T> {
    */
   async getMaxAnchors(): Promise<number> {
     const value = await this.contract.maxAnchors();
-    return typeof value === 'bigint' ? Number(value) : value;
+    return Number(value);
   }
 
   /**
