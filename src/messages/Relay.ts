@@ -1,17 +1,12 @@
 import Message from "./Message";
-import { IMessageJSON, IRelayMessage, IRelayResponse } from "../types/messages";
-import { DEFAULT_CONFIG } from "../constants";
+import { IMessageJSON, IRelayMessage, IRelayResponse } from "../types";
+import { RELAY_DEFAULT_MESSAGE_LIMIT } from "../constants";
 
 export default class Relay {
   readonly url: string;
 
   constructor(url: string) {
     this.url = url.replace(/\/$/, "");
-  }
-
-  // Can be overridden by mock for testing
-  private fetch(url: string, options: RequestInit): Promise<Response> {
-    return fetch(url, options);
   }
 
   async post(
@@ -21,10 +16,9 @@ export default class Relay {
   ): Promise<IRelayResponse> {
     endpoint = endpoint.replace(/^\//, "");
     headers["content-type"] = "application/json";
-    const body =
-      typeof postData === "string" ? postData : JSON.stringify(postData);
+    const body = typeof postData === "string" ? postData : JSON.stringify(postData);
 
-    const response = await this.fetch(`${this.url}/${endpoint}`, {
+    const response = await fetch(`${this.url}/${endpoint}`, {
       method: "POST",
       headers,
       body,
@@ -46,7 +40,7 @@ export default class Relay {
   ): Promise<IRelayResponse> {
     endpoint = endpoint.replace(/^\//, "");
 
-    const response = await this.fetch(`${this.url}/${endpoint}`, {
+    const response = await fetch(`${this.url}/${endpoint}`, {
       method: "GET",
       headers,
     });
@@ -66,9 +60,6 @@ export default class Relay {
       throw new Error("Message must be signed before sending");
     }
 
-    // Relay service will verify anchor independently by checking:
-    // 1. Message hash is anchored on-chain
-    // 2. Sender address matches the signature
     const relayMessage: IRelayMessage = {
       message: message.toJSON(),
     };
@@ -79,8 +70,8 @@ export default class Relay {
 
   async getMessages(
     recipient: string,
-    limit = DEFAULT_CONFIG.DEFAULT_MESSAGE_LIMIT,
-    offset = DEFAULT_CONFIG.DEFAULT_MESSAGE_OFFSET
+    limit = RELAY_DEFAULT_MESSAGE_LIMIT,
+    offset = 0,
   ): Promise<Message[]> {
     const response = await this.get(
       `/messages/${recipient}?limit=${limit}&offset=${offset}`
