@@ -4,7 +4,7 @@ import { randomBytes } from "@noble/hashes/utils";
 import Event from "./Event";
 import Binary from "../Binary";
 import MergeConflict from "./MergeConflict"
-import { compareBytes } from "../utils/bytes"
+import { compareBytes, isBinary } from "../utils/bytes"
 import { IBinary, IEventChainJSON, IEventJSON, VerifyFn } from "../types"
 import { BASE_CHAIN_ID } from "../constants"
 
@@ -14,7 +14,6 @@ const DERIVED_ID_V2 = 0x52;
 export default class EventChain {
   readonly id: string;
   readonly networkId: number;
-  private verifyFn?: VerifyFn;
 
   events: Array<Event> = [];
   private partial?: { hash: IBinary; state: IBinary };
@@ -29,12 +28,6 @@ export default class EventChain {
 
     const id = EventChain.buildId(EVENT_CHAIN_V3, network, Binary.fromHex(address), nonceBytes);
     return new EventChain(id);
-  }
-
-  withVerification(verifyFn: VerifyFn)
-  {
-    this.verifyFn = verifyFn;
-    return this;
   }
 
   get version(): number {
@@ -134,14 +127,14 @@ export default class EventChain {
       throw new Error(`Event doesn't fit onto the chain after ${this.latestHash.hex}`);
   }
 
-  async validate(): Promise<void> {
+  async validate(verifyFn: VerifyFn = async () => true): Promise<void> {
     if (this.events.length === 0) throw new Error('No events on event chain');
 
-    await this.validateEvents();
+    await this.validateEvents(verifyFn);
     if (this.events[0]?.previous?.hex === this.initialHash.hex) this.validateGenesis();
   }
 
-  private async validateEvents(): Promise<void> {
+  private async validateEvents(verifyFn: VerifyFn): Promise<void> {
     let previous = this.partial?.hash ?? this.initialHash;
 
     for (const event of this.events) {
@@ -156,7 +149,7 @@ export default class EventChain {
       }
 
       if (!event.verifyHash()) throw new Error(`Invalid hash of event ${event.hash.hex}`);
-      if (this.verifyFn && !(await event.verifySignature(this.verifyFn)))
+      if (!(await event.verifySignature(verifyFn)))
         throw new Error(`Invalid signature of event ${event.hash.hex}`);
       if (previous.hex !== event.previous?.hex)
         throw new Error(`Event ${event.hash.hex} doesn't fit onto the chain`);
@@ -230,6 +223,25 @@ export default class EventChain {
     return map;
   }
 
+  toBinary(): Uint8Array {
+    const versionByte = Uint8Array.from([this.version]);
+    const chainIdBytes = Binary.fromHex(this.id);
+    const partialFlag = Uint8Array.from([this.partial ? 1 : 0]);
+    const partialBytes = this.partial ? Binary.concat(this.partial.hash, this.partial.state) : new Binary(0);
+
+    const count = this.events.length;
+    const countBytes = Binary.fromInt16(count);
+
+    const eventChunks: Array<Uint8Array> = [];
+    for (const ev of this.events) {
+      const evBytes = ev.toBinary();
+      const lenBytes = Binary.fromInt32(evBytes.length);
+      eventChunks.push(lenBytes, evBytes);
+    }
+
+    return Binary.concat(versionByte, chainIdBytes, partialFlag, partialBytes, countBytes, ...eventChunks);
+  }
+
   toJSON(): IEventChainJSON {
     const events: Array<IEventJSON | { hash: string; state: string }> = this.events.map((event) => event.toJSON());
 
@@ -238,9 +250,12 @@ export default class EventChain {
     return { id: this.id, events };
   }
 
-  static from(data: IEventChainJSON): EventChain {
+  static from(data: IEventChainJSON | Uint8Array): EventChain {
+    return isBinary(data) ? EventChain.fromBinary(data) : EventChain.fromJson(data);
+  }
+
+  private static fromJson(data: IEventChainJSON): EventChain {
     const chain = new EventChain(data.id);
-    const chainVersion = chain.version;
 
     if (data.events.length === 0) return chain;
 
@@ -253,8 +268,62 @@ export default class EventChain {
     }
 
     for (const eventData of (data.events ?? []) as IEventJSON[]) {
-      chain.events.push(Event.from(eventData, chainVersion));
+      chain.events.push(Event.from(eventData));
     }
+
+    return chain;
+  }
+
+  private static fromBinary(data: Uint8Array): EventChain {
+    const bin = new Binary(data);
+    // Minimum: version(1) + id(49) + partialFlag(1) + count(2)
+    if (bin.length < 1 + 49 + 1 + 2) {
+      throw new Error('Invalid event chain binary: too short');
+    }
+
+    let offset = 0;
+
+    const version = bin[offset++];
+    if (version !== EVENT_CHAIN_V3) {
+      throw new Error(`Event chain version ${version} not supported`);
+    }
+
+    const idBytes = bin.slice(offset, offset + 49);
+    offset += 49;
+    const chainId = idBytes.hex;
+
+    const partialFlag = bin[offset++];
+
+    let partial: { hash: IBinary; state: IBinary } | undefined;
+    if (partialFlag === 1) {
+      if (offset + 64 > bin.length) throw new Error('Invalid event chain binary: partial header out of bounds');
+      const hash = bin.slice(offset, offset + 32);
+      offset += 32;
+      const state = bin.slice(offset, offset + 32);
+      offset += 32;
+      partial = { hash, state };
+    }
+
+    if (offset + 2 > bin.length) throw new Error('Invalid event chain binary: missing event count');
+    const count = bin.dataView.getUint16(offset, false);
+    offset += 2;
+
+    const events: Event[] = [];
+    for (let i = 0; i < count; i++) {
+      if (offset + 4 > bin.length) throw new Error('Invalid event chain binary: missing event length');
+      const len = bin.dataView.getUint32(offset, false);
+      offset += 4;
+      if (offset + len > bin.length) throw new Error('Invalid event chain binary: event out of bounds');
+      const evBytes = bin.slice(offset, offset + len);
+      offset += len;
+      const ev = Event.from(evBytes);
+      events.push(ev);
+    }
+
+    const chain = new EventChain(chainId);
+
+    if (partial) chain.partial = partial;
+    chain.events = events;
 
     return chain;
   }
