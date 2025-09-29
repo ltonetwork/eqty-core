@@ -36,10 +36,7 @@ const address = await signer.getAddress();
 const { chainId: networkId } = await provider.getNetwork();
 
 // Create an event chain
-const chain = EventChain.create(address, networkId)
-  .withVerification((address, domain, types, value, signature) =>
-    verifyTypedData(domain, types as any, value, signature).toLowerCase() === address.toLowerCase()
-  );
+const chain = EventChain.create(address, networkId);
 
 // Create event and add to chain
 const event = new Event({ message: "Hello EQTY!" }, "application/json").addTo(chain);
@@ -57,6 +54,12 @@ const anchorClient = new AnchorClient(contract as any);
 
 // Anchor chain map
 await anchorClient.anchor(chain.anchorMap());
+
+// Validate a received event chain
+chain.validate((address, domain, types, value, signature) =>
+  verifyTypedData(domain, types, value, signature).toLowerCase() === address.toLowerCase()
+);
+
 ```
 
 ### Messaging
@@ -120,12 +123,7 @@ const signer = new ViemSigner(walletClient);
 
 // Create an event chain
 const networkId = baseSepolia.id;
-const chain = EventChain.create(address, networkId).withVerification(
-  async (signerAddress, domain, types, value, signature) => {
-    const recovered = await recoverTypedDataAddress({ domain, types, message: value, signature });
-    return recovered.toLowerCase() === signerAddress.toLowerCase();
-  }
-);
+const chain = EventChain.create(address, networkId);
 
 // Create event and add to chain
 const event = new Event({ message: "Hello EQTY!" }, "application/json").addTo(chain);
@@ -143,6 +141,14 @@ const anchorClient = new AnchorClient(contract as any);
 
 // Anchor chain map
 await anchorClient.anchor(chain.anchorMap());
+
+// Validate a received event chain
+chain.validate(
+  async (signerAddress, domain, types, value, signature) => {
+    const recovered = await recoverTypedDataAddress({ domain, types, message: value, signature });
+    return recovered.toLowerCase() === signerAddress.toLowerCase();
+  }
+);
 ```
 
 ### Messaging
@@ -242,11 +248,11 @@ class EventChain {
   isSigned(): boolean;
 
   // Validation and metadata
-  validate(): void;
+  validate(verify: VerifyFn): Promise<void>;
   isCreatedBy(address: string, networkId: number): boolean;
 
   // Anchoring
-  anchorMap(): Array<{ key: Uint8Array; value: Uint8Array }>;
+  anchorMap: Array<{ key: Uint8Array; value: Uint8Array }>;
 
   // Serialization
   toJSON(): IEventChainJSON;

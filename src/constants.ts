@@ -15,3 +15,9 @@ export const BASE_SEPOLIA_EQTY_TOKEN = ZERO_ADDRESS; // Not deployed yet
 export const BASE_CHAIN_ID = 8453;
 export const BASE_ANCHOR_CONTRACT = ZERO_ADDRESS; // Not deployed yet
 export const BASE_EQTY_TOKEN = ZERO_ADDRESS;
+
+// Default configuration used by Relay and other modules
+export const DEFAULT_CONFIG = {
+  DEFAULT_MESSAGE_LIMIT: 50,
+  DEFAULT_MESSAGE_OFFSET: 0,
+};

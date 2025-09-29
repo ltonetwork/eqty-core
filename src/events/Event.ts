@@ -110,12 +110,28 @@ export default class Event {
   }
 
   private toBinaryV3(): Uint8Array {
+    const signerBytes = Binary.from(this.signerAddress!); // expected 42 ASCII chars for EVM address
+    const mediaTypeBytes = Binary.from(this.mediaType);
+    const dataBytes = new Binary(this.data);
+
+    if (mediaTypeBytes.length > 0xffff)
+      throw new Error("Media type too long: exceeds uint16");
+
+    // Note: JS number max safe integer is >> 2^32-1, but buffer size will be a practical limit.
+    if (dataBytes.length > 0xffffffff)
+      throw new Error("Data too long: exceeds uint32");
+
+    const mediaTypeLen = Binary.fromInt16(mediaTypeBytes.length); // uint16 BE
+    const dataLen = Binary.fromInt32(dataBytes.length); // uint32 BE
+
     return Binary.concat(
       this.previous!,
-      Binary.from(this.signerAddress!),
+      signerBytes,
       Binary.fromInt32(this.timestamp || 0),
-      Binary.from(this.mediaType),
-      this.data
+      mediaTypeLen,
+      mediaTypeBytes,
+      dataLen,
+      dataBytes
     );
   }
 
@@ -202,9 +218,7 @@ export default class Event {
     if (this.mediaType === "application/json") {
       try {
         return JSON.parse(this.data.toString());
-      } catch {
-        return this.data.toString();
-      }
+      } catch { /* empty */ }
     }
     return this.data.toString();
   }
@@ -222,19 +236,65 @@ export default class Event {
       attachments: this.attachments.map((att) => ({
         name: att.name,
         mediaType: att.mediaType,
-        data: att.data.hex,
+        data: att.data.base64,
       })),
     };
   }
 
-  static from(data: IEventJSON, version = 2): Event {
+  static from(data: IEventJSON | Uint8Array): Event {
+    return isBinary(data) ? Event.fromBinary(data) : Event.fromJson(data);
+  }
+
+  private static fromBinary(data: Uint8Array): Event {
+    const bin = new Binary(data);
+    if (bin.length < 32 + 42 + 4 + 2 + 4) {
+      throw new Error("Invalid event binary: too short");
+    }
+
+    let offset = 0;
+
+    const previous = bin.slice(offset, offset + 32);
+    offset += 32;
+
+    const signerAddress = bin.slice(offset, offset + 42).toString();
+    offset += 42;
+
+    const timestamp = bin.dataView.getInt32(offset, false);
+    offset += 4;
+
+    // mediaType length (uint16 BE)
+    const mtLen = bin.dataView.getUint16(offset, false);
+    offset += 2;
+    if (offset + mtLen > bin.length) throw new Error("Invalid event binary: mediaType out of bounds");
+    const mediaType = bin.slice(offset, offset + mtLen).toString();
+    offset += mtLen;
+
+    // data length (uint32 BE)
+    const dLen = bin.dataView.getUint32(offset, false);
+    offset += 4;
+    if (offset + dLen > bin.length) throw new Error("Invalid event binary: data out of bounds");
+    const payload = bin.slice(offset, offset + dLen);
+    offset += dLen;
+
+    const event = new Event(payload, mediaType, previous.hex);
+    event.version = EVENT_CHAIN_V3;
+    event.signerAddress = signerAddress;
+    event.timestamp = timestamp;
+
+    // Hash of the full input for consistency with producers
+    event._hash = bin.hash();
+
+    return event;
+  }
+
+  private static fromJson(data: IEventJSON): Event {
     try {
       const event = new Event(
         Binary.fromBase64(data.data),
         data.mediaType,
         data.previous
       );
-      event.version = data.version ?? version;
+      event.version = data.version;
       event.timestamp = data.timestamp;
       event.signerAddress = data.signerAddress;
       event.signature = data.signature
