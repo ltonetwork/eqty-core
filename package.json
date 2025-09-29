@@ -12,7 +12,7 @@
   "scripts": {
     "clean": "rm -rf ./dist",
     "build": "tsup",
-    "test": "TS_NODE_PROJECT=tsconfig.test.json mocha -r ts-node/register \"test/**/*.spec.ts\"",
+    "test": "NODE_OPTIONS=\"--require=./.pnp.cjs\" node tests/run-mocha.cjs",
     "lint": "eslint src --ext .ts",
     "lint-fix": "eslint src --ext .ts --fix",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\""
