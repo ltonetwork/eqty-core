@@ -1,5 +1,5 @@
-import { IViemAccount, IViemPublicClient, IViemWalletClient } from "../types";
-import { AnchorClient } from "../anchor";
+import { IViemAccount, IViemPublicClient, IViemWalletClient } from "../types"
+import { AnchorClient } from "../anchor"
 
 export default class ViemAnchorContract<TAccount extends IViemAccount> {
   constructor(
@@ -21,11 +21,10 @@ export default class ViemAnchorContract<TAccount extends IViemAccount> {
   }
 
   async maxAnchors(): Promise<number> {
-    const result = await this.client.readContract({
+    return await this.client.readContract({
       address: this.address,
       abi: AnchorClient.ABI,
       functionName: "maxAnchors",
     });
-    return Number(result);
   }
 }
