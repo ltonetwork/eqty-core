@@ -162,7 +162,7 @@ export default class Event {
 
     try {
       const { domain, types, value } = this.getSignData();
-      return verify(this.signerAddress!, domain, types, value, this.signature.hex);
+      return await verify(this.signerAddress!, domain, types, value, this.signature.hex);
     } catch {
       return false;
     }

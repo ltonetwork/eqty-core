@@ -253,7 +253,9 @@ export default class EventChain {
     }
 
     for (const eventData of (data.events ?? []) as IEventJSON[]) {
-      chain.events.push(Event.from(eventData, chainVersion));
+      const event = Event.from(eventData, chainVersion);
+      event.networkId = chain.networkId;
+      chain.events.push(event);
     }
 
     return chain;
@@ -278,24 +280,24 @@ export default class EventChain {
     const rawId = Binary.concat(prefixBytes, networkBytes, randomBytes, publicKeyHashPart);
     const addressHash = new Binary(keccak_256(rawId)).slice(0, 4);
 
-    return '0x' + Binary.concat(rawId, addressHash).hex;
+    return Binary.concat(rawId, addressHash).hex;
   }
 
   private static validateId(prefix: number, network: number, id: string, group?: Uint8Array): boolean {
     const idBytes = Binary.fromHex(id);
 
-    if (idBytes.length !== 81 || idBytes[0] !== prefix || idBytes.dataView.getInt32(1) !== network) {
+    if (idBytes.length !== 49 || idBytes[0] !== prefix || idBytes.dataView.getInt32(1) !== network) {
       return false;
     }
 
-    const rawId = idBytes.slice(0, 42);
-    const check = idBytes.slice(42);
+    const rawId = idBytes.slice(0, 45);
+    const check = idBytes.slice(45);
     const addressHash = new Binary(keccak_256(rawId)).slice(0, 4);
 
     let res = compareBytes(check, addressHash);
 
     if (res && group) {
-      const keyBytes = rawId.slice(22);
+      const keyBytes = rawId.slice(25);
       const publicKeyHashPart = keccak_256(group).slice(0, 20);
 
       res = compareBytes(keyBytes, publicKeyHashPart);

@@ -12,7 +12,7 @@
   "scripts": {
     "clean": "rm -rf ./dist",
     "build": "tsup",
-    "test": "TS_NODE_PROJECT=tsconfig.test.json mocha -r ts-node/register \"test/**/*.spec.ts\"",
+    "test": "tsx --tsconfig tsconfig.test.json tests/mocha-runner.mjs",
     "lint": "eslint src --ext .ts",
     "lint-fix": "eslint src --ext .ts --fix",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\""
@@ -49,6 +49,7 @@
     "ts-node": "^10.9.1",
     "tsconfig-paths": "^4.2.0",
     "tsup": "^8.5.0",
+    "tsx": "^4.20.6",
     "typescript": "^5.1.6",
     "viem": "^2.37.8"
   },
