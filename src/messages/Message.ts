@@ -5,7 +5,7 @@ import {
   IMessageData,
   ISignData, ISigner, VerifyFn,
 } from "../types";
-import { isBinary } from "../utils/bytes"
+import { isBinary } from "../utils/bytes";
 
 const MESSAGE_V3 = 3;
 
@@ -119,7 +119,7 @@ export default class Message {
     const { domain, types, value } = this.getSignData();
     const signature: string = await sender.signTypedData(domain, types, value);
 
-    this.signature = new Binary(signature);
+    this.signature = Binary.fromHex(signature);
 
     return this;
   }
