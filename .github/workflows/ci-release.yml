@@ -49,7 +49,6 @@ jobs:
         with:
           node-version: 22
           cache: 'yarn'
-          registry-url: 'https://registry.npmjs.org/'
       - name: Install dependencies
         run: yarn install
       - name: Release
