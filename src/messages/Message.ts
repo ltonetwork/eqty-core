@@ -103,8 +103,8 @@ export default class Message {
       recipient: this.recipient!,
       timestamp: this.timestamp!,
       mediaType: this.mediaType,
-      dataHash: new Binary(this.data).hash(),
-      metaHash,
+      dataHash: new Binary(this.data).hash().hex,
+      metaHash: metaHash.hex,
     };
 
     return { domain, types, value };

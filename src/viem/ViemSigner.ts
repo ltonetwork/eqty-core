@@ -1,7 +1,7 @@
-import { ISigner, ITypedDataDomain, ITypedDataField, IViemAccount, IViemWalletClient } from "../types";
+import { ISigner, ITypedDataDomain, ITypedDataField } from "../types";
 
-export default class ViemSigner<T extends IViemAccount> implements ISigner {
-  constructor(private client: IViemWalletClient<T>) {}
+export default class ViemSigner implements ISigner {
+  constructor(private client: any) {}
 
   async getAddress(): Promise<string> {
     if (!this.client.account) throw new Error("No account set on wallet client");

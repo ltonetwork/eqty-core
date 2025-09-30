@@ -1,14 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Wallet, verifyTypedData } from "ethers";
-import { recoverTypedDataAddress } from "viem";
+import { Account, createWalletClient, http, WalletClient, verifyTypedData as viemVerifyTypedData } from "viem";
 import Event from "../../src/events/Event";
 import EventChain, { EVENT_CHAIN_V3 } from "../../src/events/EventChain";
 import Binary from "../../src/Binary";
 import { ViemSigner } from "../../src/viem";
-import type { IViemWalletClient, IViemAccount } from "../../src/types";
+import { privateKeyToAccount } from "viem/accounts"
+import { mainnet } from "viem/chains"
 
 const PRIVATE_KEY_A = `0x${"11".repeat(32)}`;
-const PRIVATE_KEY_B = `0x${"22".repeat(32)}`;
 
 const createWallet = (key: string) => new Wallet(key);
 const toAddress = (wallet: Wallet) => wallet.address.toLowerCase() as `0x${string}`;
@@ -23,25 +23,6 @@ const normalizeMessage = (value: any) => ({
   previous: value.previous instanceof Binary ? (value.previous as Binary).hex : value.previous,
   dataHash: value.dataHash instanceof Binary ? (value.dataHash as Binary).hex : value.dataHash,
 });
-
-const createVerifyWithViem = () =>
-  async (
-    address: string,
-    domain: any,
-    types: any,
-    value: any,
-    signature: string,
-  ) => {
-    const recovered = await recoverTypedDataAddress({
-      domain,
-      types,
-      message: normalizeMessage(value),
-      primaryType: Object.keys(types)[0],
-      signature: signature as `0x${string}`,
-    });
-
-    return recovered.toLowerCase() === address.toLowerCase();
-  };
 
 describe("Event", () => {
   it("encodes string, json, and binary data with proper defaults", () => {
@@ -130,29 +111,6 @@ describe("Event", () => {
     expect(event.signature).toBeInstanceOf(Binary);
     expect(await event.verifySignature(verify)).toBe(true);
     expect(event.verifyHash()).toBe(true);
-  });
-
-  it("signs with viem signer and validates signature", async () => {
-    const wallet = createWallet(PRIVATE_KEY_B);
-    const account: IViemAccount = { address: wallet.address };
-    const client: IViemWalletClient<IViemAccount> = {
-      account,
-      signTypedData: async ({ domain, types, message }) =>
-        wallet.signTypedData(domain, types, normalizeMessage(message)),
-      writeContract: async () => "0x",
-    };
-
-    const signer = new ViemSigner(client);
-    const verify = createVerifyWithViem();
-    const address = toAddress(wallet);
-    expect(address).toMatch(/^0x[0-9a-f]+$/);
-    const chain = EventChain.create(address, 7331, "viem-test");
-    const event = new Event({ viem: true }).addTo(chain);
-
-    await event.signWith(signer);
-
-    expect(event.signature?.hex.startsWith("0x")).toBe(true);
-    await expect(event.verifySignature(verify)).resolves.toBe(true);
   });
 
   it("returns false for verification errors or missing data", async () => {
@@ -260,4 +218,46 @@ describe("Event", () => {
       } as any),
     ).toThrow(/Failed to create event from JSON/);
   });
+
+  describe("viem", () => {
+    let walletClient: WalletClient;
+    let account: Account;
+    let signer: ViemSigner;
+
+    beforeEach(() => {
+      // Create real viem clients
+      account = privateKeyToAccount(`0x${"11".repeat(32)}`);
+      walletClient = createWalletClient({ chain: mainnet, transport: http("http://127.0.0.1:8545"), account });
+
+      signer = new ViemSigner(walletClient);
+    });
+
+    afterEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it("signs and verifies events with viem using ViemSigner", async () => {
+      const creator = account.address as `0x${string}`;
+      const chain = EventChain.create(creator, 1337, "viem-event");
+      const event = new Event({ hello: "viem" }, "application/json").addTo(chain);
+
+      await event.signWith(signer);
+
+      expect(event.signerAddress?.toLowerCase()).toBe(account.address.toLowerCase());
+      expect(event.isSigned()).toBe(true);
+
+      const verified = await event.verifySignature(async (address, domain, types, value, signature) => {
+        return await viemVerifyTypedData({
+          address: address as `0x${string}`,
+          domain: domain,
+          types: types,
+          primaryType: "Event",
+          message: value,
+          signature: signature as `0x${string}`,
+        });
+      });
+
+      expect(verified).toBe(true);
+    });
+  })
 });

@@ -16,6 +16,7 @@
     "test": "vitest run",
     "lint": "eslint src --ext .ts",
     "lint-fix": "eslint src --ext .ts --fix",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "release": "semantic-release"
   },

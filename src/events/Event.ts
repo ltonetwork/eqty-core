@@ -163,11 +163,11 @@ export default class Event {
 
     const value = {
       version: this.version,
-      previous: this.previous!,
+      previous: this.previous!.hex,
       signer: this.signerAddress!,
       timestamp: this.timestamp!,
       mediaType: this.mediaType,
-      dataHash: new Binary(this.data).hash(),
+      dataHash: new Binary(this.data).hash().hex,
     };
 
     return { domain, types, value };
@@ -272,7 +272,6 @@ export default class Event {
     offset += 4;
     if (offset + dLen > bin.length) throw new Error("Invalid event binary: data out of bounds");
     const payload = bin.slice(offset, offset + dLen);
-    offset += dLen;
 
     const event = new Event(payload, mediaType, previous.hex);
     event.version = EVENT_CHAIN_V3;

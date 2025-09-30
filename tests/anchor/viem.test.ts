@@ -21,7 +21,7 @@ let simulateSpy: MockInstance;
 let writeSpy: MockInstance;
 let readSpy: MockInstance;
 
-describe("AnchorClient with viem (via ViemAnchorContract)", () => {
+describe("AnchorClient with viem", () => {
   const key = Binary.fromHex("11".repeat(32));
   const value = Binary.fromHex("22".repeat(32));
 

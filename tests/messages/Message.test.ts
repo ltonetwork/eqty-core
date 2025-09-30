@@ -1,9 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import Message from "../../src/messages/Message";
 import Binary from "../../src/Binary";
 import { Wallet, verifyTypedData } from "ethers";
-import { privateKeyToAccount } from "viem/accounts";
-import { recoverTypedDataAddress } from "viem";
+import { Account, createWalletClient, http, WalletClient, verifyTypedData as viemVerifyTypedData } from "viem";
+import { privateKeyToAccount } from "viem/accounts"
+import { mainnet } from "viem/chains"
+import { ViemSigner } from "../../src"
 
 const hexSignature = `0x${"11".repeat(65)}`;
 
@@ -218,53 +220,6 @@ describe("Message", () => {
     );
   });
 
-  it("signs and verifies with viem", async () => {
-    const account = privateKeyToAccount(`0x${"22".repeat(32)}`);
-    const viemSigner = {
-      async getAddress() {
-        return account.address;
-      },
-      async signTypedData(domain: any, types: any, value: any) {
-        const messageValue = {
-          ...value,
-          dataHash: value.dataHash.hex ?? Binary.from(value.dataHash).hex,
-          metaHash: value.metaHash.hex ?? Binary.from(value.metaHash).hex,
-        };
-
-        return account.signTypedData({
-          domain,
-          types,
-          primaryType: Object.keys(types)[0] as any,
-          message: messageValue,
-        });
-      },
-    };
-
-    const message = new Message({ hello: "viem" }).to(account.address);
-
-    await message.signWith(viemSigner);
-
-    const verified = await message.verifySignature(async (address, domain, types, value, signature) => {
-      const messageValue = {
-        ...value,
-        dataHash: value.dataHash.hex ?? Binary.from(value.dataHash).hex,
-        metaHash: value.metaHash.hex ?? Binary.from(value.metaHash).hex,
-      };
-
-      const recovered = await recoverTypedDataAddress({
-        domain,
-        types,
-        primaryType: Object.keys(types)[0] as any,
-        message: messageValue,
-        signature: signature as `0x${string}`,
-      });
-
-      return recovered.toLowerCase() === address.toLowerCase();
-    });
-
-    expect(verified).toBe(true);
-  });
-
   it("serializes and deserializes via JSON", () => {
     const wallet = Wallet.createRandom();
     const message = new Message("serialize").to(wallet.address);
@@ -330,5 +285,46 @@ describe("Message", () => {
     message.version = 42;
 
     expect(() => message.toBinary()).toThrow("Message version 42 not supported");
+  });
+
+  describe("viem", () => {
+    let walletClient: WalletClient;
+    let account: Account;
+    let signer: ViemSigner;
+
+    beforeEach(() => {
+      // Create real viem clients
+      account = privateKeyToAccount(`0x${"11".repeat(32)}`);
+      walletClient = createWalletClient({ chain: mainnet, transport: http("http://127.0.0.1:8545"), account });
+
+      signer = new ViemSigner(walletClient);
+    });
+
+    afterEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it("signs and verifies messages with viem using ViemSigner", async () => {
+      const recipient = privateKeyToAccount(`0x${"22".repeat(32)}`).address;
+      const message = new Message("hello viem").to(recipient);
+
+      await message.signWith(signer);
+
+      expect(message.sender?.toLowerCase()).toBe(account.address.toLowerCase());
+      expect(message.isSigned()).toBe(true);
+
+      const verified = await message.verifySignature(async (address, domain, types, value, signature) => {
+        return await viemVerifyTypedData({
+          address: address as `0x${string}`,
+          domain: domain,
+          types: types,
+          primaryType: "Message",
+          message: value,
+          signature: signature as `0x${string}`,
+        });
+      });
+
+      expect(verified).toBe(true);
+    });
   });
 });

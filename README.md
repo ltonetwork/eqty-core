@@ -59,7 +59,6 @@ await anchorClient.anchor(chain.anchorMap());
 chain.validate((address, domain, types, value, signature) =>
   verifyTypedData(domain, types, value, signature).toLowerCase() === address.toLowerCase()
 );
-
 ```
 
 ### Messaging
@@ -79,9 +78,10 @@ const message = new Message("Hello from EQTY!", "text/plain", {
   title: "Welcome Message",
 });
 
-// Set recipient (optional) and sign the message
-// message.to("0xRecipientAddress");
-await message.signWith(signer);
+// Set the recipient and sign the message
+await message
+  .to("0x8dB7BC85A8ec23B2190D6dA004DE58FeFB2FBbAD")
+  .signWith(signer);
 
 // Create anchor client
 const contract = new Contract(
@@ -93,6 +93,11 @@ const anchorClient = new AnchorClient(contract as any);
 
 // Anchor message hash to blockchain
 await anchorClient.anchor(message.hash);
+
+// Validate a received message
+chain.validate((address, domain, types, value, signature) =>
+  verifyTypedData(domain, types, value, signature).toLowerCase() === address.toLowerCase()
+);
 ```
 
 ## Quick Start with Viem
@@ -144,9 +149,15 @@ await anchorClient.anchor(chain.anchorMap());
 
 // Validate a received event chain
 chain.validate(
-  async (signerAddress, domain, types, value, signature) => {
-    const recovered = await recoverTypedDataAddress({ domain, types, message: value, signature });
-    return recovered.toLowerCase() === signerAddress.toLowerCase();
+  async (address, domain, types, value, signature) => {
+    return await viemVerifyTypedData({
+      address: address as `0x${string}`,
+      domain: domain,
+      types: types,
+      primaryType: "Event",
+      message: value,
+      signature: signature as `0x${string}`,
+    });
   }
 );
 ```
@@ -180,9 +191,11 @@ const message = new Message("Hello from EQTY!", "text/plain", {
   title: "Welcome Message",
 });
 
-// Optionally set recipient and sign
-// message.to("0xRecipientAddress");
-await message.signWith(signer);
+
+// Set the recipient and sign the message
+await message
+  .to("0x8dB7BC85A8ec23B2190D6dA004DE58FeFB2FBbAD")
+  .signWith(signer);
 
 // Set up ViemContract and AnchorClient
 const contract = new ViemContract(
@@ -194,6 +207,21 @@ const anchorClient = new AnchorClient(contract as any);
 
 // Anchor message hash to blockchain
 await anchorClient.anchor(message.hash);
+
+// Validate a received message
+message.validate(
+  async (address, domain, types, value, signature) => {
+    return await viemVerifyTypedData({
+      address: address as `0x${string}`,
+      domain: domain,
+      types: types,
+      primaryType: "Event",
+      message: value,
+      signature: signature as `0x${string}`,
+    });
+  }
+);
+
 ```
 
 ## API Reference
