@@ -32,7 +32,8 @@ describe("AnchorClient with viem (via ViemAnchorContract)", () => {
     walletClient = createWalletClient({ chain: mainnet, transport: http("http://127.0.0.1:8545"), account });
 
     // Mock only the methods we use to avoid network calls
-    simulateSpy = vi.spyOn(publicClient, "simulateContract").mockImplementation(async (args: any) => ({ result: undefined, request: args }));
+    // @ts-expect-error TS2345
+    simulateSpy = vi.spyOn(publicClient, "simulateContract").mockImplementation(async (args: any) => ({ result: '0x123', request: args }));
     readSpy = vi.spyOn(publicClient, "readContract").mockResolvedValue(16n);
     writeSpy = vi.spyOn(walletClient, "writeContract").mockResolvedValue("0xdeadbeef");
 

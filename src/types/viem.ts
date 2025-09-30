@@ -25,16 +25,3 @@ export interface IViemWalletClient<TAccount extends IViemAccount> {
 
   writeContract(args: IViemRequest<TAccount>): Promise<string>;
 }
-
-export interface IViemPublicClient {
-  simulateContract<TAccount extends IViemAccount>(
-    args: IViemRequest<TAccount>,
-  ): Promise<{ result: any, request: IViemRequest<TAccount> }>;
-
-  readContract(args: {
-    address: string,
-    abi: any,
-    functionName: string,
-    args?: any[],
-  }): Promise<any>;
-}

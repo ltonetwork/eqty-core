@@ -7,7 +7,6 @@ import {
   ZERO_HASH
 } from "../constants";
 import { ANCHOR_ABI } from "./AnchorABI";
-import { AnchorContract } from "../types"
 import { isBinary } from "../utils/bytes"
 
 /**
@@ -16,7 +15,7 @@ import { isBinary } from "../utils/bytes"
 export default class AnchorClient<T> {
   static readonly ABI = ANCHOR_ABI;
 
-  constructor(private contract: AnchorContract<T>) {}
+  constructor(private contract: any) {}
 
   private convertAnchors(
     input: Array<{ key: Uint8Array; value: Uint8Array }> | Array<Uint8Array> | Uint8Array,
