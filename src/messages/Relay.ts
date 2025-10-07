@@ -16,7 +16,8 @@ export default class Relay {
   ): Promise<IRelayResponse> {
     endpoint = endpoint.replace(/^\//, "");
     headers["content-type"] = "application/json";
-    const body = typeof postData === "string" ? postData : JSON.stringify(postData);
+    const body =
+      typeof postData === "string" ? postData : JSON.stringify(postData);
 
     const response = await fetch(`${this.url}/${endpoint}`, {
       method: "POST",
@@ -71,7 +72,7 @@ export default class Relay {
   async getMessages(
     recipient: string,
     limit = RELAY_DEFAULT_MESSAGE_LIMIT,
-    offset = 0,
+    offset = 0
   ): Promise<Message[]> {
     const response = await this.get(
       `/messages/${recipient}?limit=${limit}&offset=${offset}`
