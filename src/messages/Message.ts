@@ -3,7 +3,9 @@ import {
   IMessageMeta,
   IMessageJSON,
   IMessageData,
-  ISignData, ISigner, VerifyFn,
+  ISignData,
+  ISigner,
+  VerifyFn,
 } from "../types";
 import { isBinary } from "../utils/bytes";
 
@@ -60,7 +62,10 @@ export default class Message {
   }
 
   get hash(): Binary {
-    return this._hash ?? new Binary(this.toBinary(false)).hash();
+    if (!this._hash) {
+      this._hash = new Binary(this.toBinary(false)).hash();
+    }
+    return this._hash;
   }
 
   to(recipient: string): Message {
@@ -185,7 +190,7 @@ export default class Message {
       version: this.version,
       meta: this.meta,
       mediaType: this.mediaType,
-      data: this.data.base58,
+      data: this.data.base64,
       timestamp: this.timestamp,
       sender: this.sender,
       signature: this.signature?.base58,
@@ -200,15 +205,15 @@ export default class Message {
 
   private static fromJSON(json: IMessageJSON): Message {
     try {
-      const message = new Message(
-        Binary.fromBase58(json.data),
-        json.mediaType,
-        json.meta
-      );
+      const data = Binary.fromBase64(json.data);
+
+      const message = new Message(data, json.mediaType, json.meta);
       message.version = json.version;
       message.timestamp = json.timestamp;
       message.sender = json.sender;
-      message.signature = json.signature ? Binary.fromBase58(json.signature) : undefined;
+      message.signature = json.signature
+        ? Binary.fromBase58(json.signature)
+        : undefined;
       message.recipient = json.recipient;
       message._hash = json.hash ? Binary.fromBase58(json.hash) : undefined;
 
