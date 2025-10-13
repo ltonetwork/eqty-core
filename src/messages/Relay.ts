@@ -56,6 +56,25 @@ export default class Relay {
     return (await response.json()) as IRelayResponse;
   }
 
+  async delete(
+    endpoint: string,
+    headers: Record<string, string> = {}
+  ): Promise<void> {
+    endpoint = endpoint.replace(/^\//, "");
+
+    const response = await fetch(`${this.url}/${endpoint}`, {
+      method: "DELETE",
+      headers,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        `Relay error: ${response.status} - ${JSON.stringify(errorData)}`
+      );
+    }
+  }
+
   async send(message: Message): Promise<Message> {
     if (!message.isSigned()) {
       throw new Error("Message must be signed before sending");
